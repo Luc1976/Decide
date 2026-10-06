@@ -6,7 +6,7 @@ from models import TipologiaProjeto
 
 
 def _opcoes(*rotulos):
-    return [ft.dropdown.Option(r) for r in rotulos]
+    return [ft.DropdownOption(key=r, text=r) for r in rotulos]
 
 
 def criar_aba_sistemas_construtivos(page, projeto, usuario, pode_editar: bool):
@@ -210,8 +210,8 @@ def criar_aba_sistemas_construtivos(page, projeto, usuario, pode_editar: bool):
         mensagem.value = "Premissas de sistemas construtivos guardadas."
         page.update()
 
-    btn_guardar = ft.ElevatedButton(
-        "Guardar premissas",
+    btn_guardar = ft.Button(
+        content="Guardar premissas",
         on_click=guardar_dados,
         visible=False,
     )
@@ -219,7 +219,7 @@ def criar_aba_sistemas_construtivos(page, projeto, usuario, pode_editar: bool):
         label="Selecione a tipologia do projeto",
         options=_opcoes(*(t.value for t in TipologiaProjeto)),
         value=salvo.tipologia if salvo else None,
-        on_change=atualizar_formulario,
+        on_select=atualizar_formulario,
         disabled=not pode_editar,
     )
     if dropdown_tipologia.value:

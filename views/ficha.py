@@ -326,37 +326,44 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar):
         ),
     )
 
-    return ft.View(
-        route="/ficha",
-        controls=[
-            header,
-            ft.Tabs(
-                selected_index=0,
-                animation_duration=300,
+    aba_dados = ft.Column(
+        [
+            mensagem,
+            ft.ListView(
                 expand=True,
-                tabs=[
-                    ft.Tab(
-                        text="Dados gerais",
-                        content=ft.Column(
-                            [
-                                mensagem,
-                                ft.ListView(
-                                    expand=True,
-                                    spacing=15,
-                                    padding=10,
-                                    controls=cards,
-                                ),
-                            ],
-                            expand=True,
-                        ),
-                    ),
-                    ft.Tab(
-                        text="Sistemas construtivos",
-                        content=criar_aba_sistemas_construtivos(
-                            page, projeto, usuario, pode_editar
-                        ),
-                    ),
-                ],
+                spacing=15,
+                padding=10,
+                controls=cards,
             ),
         ],
+        expand=True,
+    )
+    aba_sistemas = criar_aba_sistemas_construtivos(page, projeto, usuario, pode_editar)
+
+    # Flet 1.0: as abas são um conjunto Tabs > (TabBar + TabBarView); "length" = nº de abas.
+    abas = ft.Tabs(
+        length=2,
+        selected_index=0,
+        animation_duration=300,
+        expand=True,
+        content=ft.Column(
+            expand=True,
+            controls=[
+                ft.TabBar(
+                    tabs=[
+                        ft.Tab(label="Dados gerais"),
+                        ft.Tab(label="Sistemas construtivos"),
+                    ]
+                ),
+                ft.TabBarView(
+                    expand=True,
+                    controls=[aba_dados, aba_sistemas],
+                ),
+            ],
+        ),
+    )
+
+    return ft.View(
+        route="/ficha",
+        controls=[header, abas],
     )
