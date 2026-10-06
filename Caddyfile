@@ -1,0 +1,5 @@
+# HTTPS automático (Let's Encrypt) e suporte a WebSocket, que o Flet usa.
+{$DOMINIO} {
+	encode gzip
+	reverse_proxy app:8000
+}

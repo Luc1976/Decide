@@ -1,0 +1,30 @@
+[project]
+name = "memoria-de-projetos"
+version = "1.0.0"
+description = "Memória de decisões de projeto: linha do tempo, atas e ficha do empreendimento."
+requires-python = ">=3.12"
+authors = [
+    { name = "Your name", email = "you@example.com" }
+]
+dependencies = [
+    "flet",
+    "flet-web",   # servidor web (necessário para publicar como site)
+    "fastapi",
+    "uvicorn[standard]",
+    "sqlmodel",
+    "reportlab"   # relatório de decisões em PDF
+]
+
+[dependency-groups]
+dev = [
+    "flet-cli",
+    "flet-desktop"
+]
+
+[tool.flet.metadata]
+title = "Memória de Projetos"
+
+[tool.flet]
+org = "dev.flet"
+company = "Flet"
+copyright = "Copyright (C) 2023-2026 by Flet"
