@@ -6,6 +6,7 @@ no editor de sempre.
 
 Configuração (variáveis de ambiente, só no servidor; a chave nunca vai para o navegador):
   ANTHROPIC_API_KEY        chave da API da Anthropic (ou MEMORIA_ANTHROPIC_API_KEY).
+  MEMORIA_ANTHROPIC_WORKSPACE_ID  ID do workspace (wrkspc_...), se a chave não for de workspace.
   MEMORIA_IA_MODELO        modelo (padrão claude-sonnet-5-5; claude-haiku-5-5 é mais barato).
   MEMORIA_IA_LIMITE_MES    máximo de transcrições por projeto por mês (padrão 30; 0 = sem limite).
 
@@ -47,6 +48,11 @@ def _chave() -> str:
 
 def ia_configurada() -> bool:
     return bool(_chave())
+
+
+def _workspace() -> str:
+    """ID do workspace da Anthropic, exigido quando a chave não está ligada a um workspace."""
+    return (os.getenv("MEMORIA_ANTHROPIC_WORKSPACE_ID") or "").strip()
 
 
 def _modelo() -> str:
@@ -217,6 +223,7 @@ def _chamar_api(sistema: str, usuario: str, max_tokens: int = 8000) -> str:
             "content-type": "application/json",
             "x-api-key": chave,
             "anthropic-version": API_VERSION,
+            **({"anthropic-workspace-id": _workspace()} if _workspace() else {}),
         },
     )
     try:
