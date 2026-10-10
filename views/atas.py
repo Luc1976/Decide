@@ -1,7 +1,10 @@
+import asyncio
 import datetime
 
 import flet as ft
+import ia_transcricao
 from database import (
+    buscar_decisoes_projeto,
     adicionar_adendo,
     atualizar_reuniao_rascunho,
     buscar_reuniao,
@@ -15,7 +18,7 @@ from database import (
     listar_decisoes_reuniao,
     nivel_no_projeto,
 )
-from models import NIVEL_PAPEL
+from models import CATEGORIAS, IMPACTOS, NIVEL_PAPEL
 from layout import col, largura_dialogo, opcoes_dialogo
 from ficha_calculos import analisar_alteracoes_ata
 
@@ -100,6 +103,7 @@ def build_atas_view(
     )
     mensagem_editor = ft.Text("", color=ft.Colors.RED_400, size=12)
     aviso_ficha = ft.Text("", size=12, color=ft.Colors.AMBER_600)
+    aviso_ia = ft.Text("", size=12, color=ft.Colors.AMBER_600)  # avisos do rascunho por IA
     campos_ficha = []  # campos da ficha usados para reconhecer as linhas [F]
 
     def recarregar_campos_ficha():
@@ -188,6 +192,120 @@ def build_atas_view(
         page.pop_dialog()
         page.show_dialog(modal_confirmar)
 
+    # ---------- Importar transcrição (rascunho gerado por IA) ----------
+    input_transcricao = ft.TextField(
+        label="Transcrição da reunião",
+        hint_text="Cole aqui o texto da transcrição (Teams: Reunião > Transcrição > copiar, ou o conteúdo do .vtt).",
+        multiline=True,
+        min_lines=8,
+        max_lines=14,
+    )
+    mensagem_importar = ft.Text("", size=12, color=ft.Colors.RED_400)
+    progresso_importar = ft.ProgressRing(visible=False, width=22, height=22)
+    botao_gerar = ft.Button(content="Gerar rascunho", icon=ft.Icons.AUTO_AWESOME)
+
+    def voltar_do_importar(_=None):
+        page.pop_dialog()
+        page.show_dialog(modal_editor)
+
+    async def gerar_do_importar(_):
+        if not input_transcricao.value or not input_transcricao.value.strip():
+            mensagem_importar.value = "Cole a transcrição primeiro."
+            page.update()
+            return
+        botao_gerar.disabled = True
+        progresso_importar.visible = True
+        mensagem_importar.color = ft.Colors.GREY_400
+        mensagem_importar.value = "Gerando o rascunho... pode levar de 20 s a alguns minutos."
+        page.update()
+        try:
+            # só quem edita o projeto chega aqui; a chave da IA fica no servidor
+            if nivel_no_projeto(usuario.id, projeto.id) < NIVEL_PAPEL["Editor"]:
+                raise PermissionError("Sem permissão para editar este projeto.")
+            recarregar_campos_ficha()
+            recentes = [
+                f"{_codigo(d)} {d.titulo}" for d in buscar_decisoes_projeto(projeto.id, "")
+            ]
+            resultado = await asyncio.to_thread(
+                ia_transcricao.gerar_rascunho,
+                input_transcricao.value,
+                projeto.id,
+                projeto.nome,
+                CATEGORIAS,
+                IMPACTOS,
+                list(campos_ficha),
+                recentes,
+            )
+        except (ia_transcricao.ErroIA, PermissionError) as erro:
+            mensagem_importar.color = ft.Colors.RED_400
+            mensagem_importar.value = str(erro)
+            botao_gerar.disabled = False
+            progresso_importar.visible = False
+            page.update()
+            return
+        except Exception:
+            mensagem_importar.color = ft.Colors.RED_400
+            mensagem_importar.value = "Erro inesperado ao gerar o rascunho. Tente novamente."
+            botao_gerar.disabled = False
+            progresso_importar.visible = False
+            page.update()
+            return
+        atual = (input_texto.value or "").strip()
+        input_texto.value = (atual + "\n\n" if atual else "") + resultado["texto"]
+        if resultado["participantes"] and not (input_participantes.value or "").strip():
+            input_participantes.value = ", ".join(resultado["participantes"])
+        aviso_ia.value = " ".join(resultado["avisos"])
+        input_transcricao.value = ""
+        botao_gerar.disabled = False
+        progresso_importar.visible = False
+        mensagem_importar.value = ""
+        atualizar_resumo()
+        page.pop_dialog()
+        page.show_dialog(modal_editor)
+        page.update()
+
+    botao_gerar.on_click = gerar_do_importar
+
+    modal_importar = ft.AlertDialog(
+        **opcoes_dialogo(page),
+        title=ft.Text("Importar transcrição"),
+        content=ft.Container(
+            width=largura_dialogo(page, 700),
+            content=ft.Column(
+                tight=True,
+                scroll=ft.ScrollMode.AUTO,
+                controls=[
+                    ft.Text(
+                        "A IA lê a transcrição e monta um RASCUNHO de ata com as decisões "
+                        "sugeridas. Nada é registrado até você revisar e fechar a ata.",
+                        size=13,
+                    ),
+                    ft.Text(ia_transcricao.AVISO_PRIVACIDADE, size=12, color=ft.Colors.AMBER_600),
+                    input_transcricao,
+                    ft.Row([progresso_importar, mensagem_importar], wrap=True),
+                ],
+            ),
+        ),
+        actions=[
+            ft.TextButton(content="Voltar", on_click=voltar_do_importar),
+            botao_gerar,
+        ],
+    )
+
+    def abrir_importacao(_):
+        mensagem_importar.value = ""
+        mensagem_editor.value = ""
+        if not ia_transcricao.ia_configurada():
+            mensagem_importar.color = ft.Colors.RED_400
+            mensagem_importar.value = (
+                "A IA ainda não está configurada neste servidor (falta a variável ANTHROPIC_API_KEY)."
+            )
+            botao_gerar.disabled = True
+        else:
+            botao_gerar.disabled = False
+        page.pop_dialog()
+        page.show_dialog(modal_importar)
+
     modal_editor = ft.AlertDialog(
         **opcoes_dialogo(page),
         title=ft.Text("Nova ata"),
@@ -202,12 +320,18 @@ def build_atas_view(
                     input_texto,
                     contador_decisoes,
                     aviso_ficha,
+                    aviso_ia,
                     mensagem_editor,
                 ],
             ),
         ),
         actions=[
             ft.TextButton(content="Cancelar", on_click=lambda _: page.pop_dialog()),
+            ft.TextButton(
+                content="Importar transcrição",
+                icon=ft.Icons.AUTO_AWESOME,
+                on_click=abrir_importacao,
+            ),
             ft.Button(content="Salvar rascunho", on_click=salvar_rascunho),
             ft.Button(
                 content="Fechar ata",
@@ -233,6 +357,7 @@ def build_atas_view(
             input_participantes.value = reuniao.participantes or ""
             input_texto.value = reuniao.texto
         mensagem_editor.value = ""
+        aviso_ia.value = ""
         recarregar_campos_ficha()
         atualizar_resumo()
         page.show_dialog(modal_editor)
