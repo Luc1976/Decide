@@ -1,8 +1,13 @@
 import asyncio
 import datetime
+import uuid
+from urllib.parse import quote
 
 import flet as ft
 import ia_transcricao
+from ata_pdf import gerar_ata_pdf, nome_do_arquivo_ata
+from config import NOME_APP, RELATORIOS_DIR, limpar_relatorios_antigos
+from seguranca import assinar_token, segredo_do_servidor
 from database import (
     buscar_decisoes_projeto,
     adicionar_adendo,
@@ -84,8 +89,79 @@ def build_atas_view(
     # ---------- Editor (ata nova ou rascunho) ----------
     input_titulo = ft.TextField(label="Título da reunião")
     input_data = ft.TextField(label="Data (dd/mm/aaaa)", col=col(12, md=4))
-    input_participantes = ft.TextField(
-        label="Participantes", hint_text="Nomes separados por vírgula", col=col(12, md=8)
+    # O texto "Ana, Bruno" continua sendo o que se grava na ata; aqui ele aparece em chips.
+    input_participantes = ft.TextField(label="Participantes", visible=False)
+    participantes_chips = ft.Row(wrap=True, spacing=6, run_spacing=6)
+    campo_novo_participante = ft.TextField(
+        label="Nome do participante",
+        hint_text="Digite e toque em Adicionar (vários: separe por vírgula)",
+        col=col(12, md=6),
+    )
+    sugestoes_participantes = ft.Dropdown(
+        label="Já participou de outras atas",
+        col=col(12, md=6),
+        options=[],
+    )
+
+    def lista_participantes():
+        return [n.strip() for n in (input_participantes.value or "").split(",") if n.strip()]
+
+    def gravar_participantes(nomes):
+        unicos = []
+        for nome in nomes:
+            nome = (nome or "").strip()
+            if nome and nome.casefold() not in [u.casefold() for u in unicos]:
+                unicos.append(nome)
+        input_participantes.value = ", ".join(unicos)
+        desenhar_participantes()
+
+    def remover_participante(nome):
+        gravar_participantes([n for n in lista_participantes() if n != nome])
+        page.update()
+
+    def desenhar_participantes():
+        participantes_chips.controls = [
+            ft.Chip(
+                label=ft.Text(nome),
+                on_delete=lambda _, nome=nome: remover_participante(nome),
+            )
+            for nome in lista_participantes()
+        ]
+        if not participantes_chips.controls:
+            participantes_chips.controls = [ft.Text("Nenhum participante informado.", size=12, color=ft.Colors.GREY_400)]
+
+    def adicionar_participantes(nomes):
+        gravar_participantes(lista_participantes() + list(nomes))
+        campo_novo_participante.value = ""
+        sugestoes_participantes.value = None
+        page.update()
+
+    def adicionar_digitado(_):
+        adicionar_participantes((campo_novo_participante.value or "").split(","))
+
+    def adicionar_sugerido(_):
+        if sugestoes_participantes.value:
+            adicionar_participantes([sugestoes_participantes.value])
+
+    def recarregar_sugestoes():
+        """Nomes já usados nas atas deste projeto, para escolher sem digitar de novo."""
+        nomes = []
+        if projeto is not None:
+            for ata_anterior in buscar_reunioes_projeto(projeto.id, ""):
+                for nome in (ata_anterior.participantes or "").split(","):
+                    nome = nome.strip()
+                    if nome and nome.casefold() not in [n.casefold() for n in nomes]:
+                        nomes.append(nome)
+        sugestoes_participantes.options = [
+            ft.DropdownOption(key=nome, text=nome) for nome in sorted(nomes, key=str.casefold)
+        ]
+        sugestoes_participantes.value = None
+
+    botao_adicionar_participante = ft.Button(
+        content="Adicionar", icon=ft.Icons.PERSON_ADD, on_click=adicionar_digitado, col=col(6, md=3)
+    )
+    botao_adicionar_sugerido = ft.TextButton(
+        content="Adicionar escolhido", on_click=adicionar_sugerido, col=col(6, md=3)
     )
     contador_decisoes = ft.Text("", size=12, color=ft.Colors.BLUE_200)
 
@@ -97,8 +173,9 @@ def build_atas_view(
         label="Texto da ata",
         hint_text="Escreva a ata. Linha [D] = decisão. " + DICA_FICHA,
         multiline=True,
-        min_lines=10,
-        max_lines=18,
+        min_lines=18,
+        max_lines=30,
+        expand=True,
         on_change=atualizar_contador,
     )
     mensagem_editor = ft.Text("", color=ft.Colors.RED_400, size=12)
@@ -252,8 +329,8 @@ def build_atas_view(
             return
         atual = (input_texto.value or "").strip()
         input_texto.value = (atual + "\n\n" if atual else "") + resultado["texto"]
-        if resultado["participantes"] and not (input_participantes.value or "").strip():
-            input_participantes.value = ", ".join(resultado["participantes"])
+        if resultado["participantes"] and not lista_participantes():
+            gravar_participantes(resultado["participantes"])
         aviso_ia.value = " ".join(resultado["avisos"])
         input_transcricao.value = ""
         botao_gerar.disabled = False
@@ -310,13 +387,21 @@ def build_atas_view(
         **opcoes_dialogo(page),
         title=ft.Text("Nova ata"),
         content=ft.Container(
-            width=largura_dialogo(page, 700),
+            width=largura_dialogo(page, 1000),
             content=ft.Column(
                 tight=True,
                 scroll=ft.ScrollMode.AUTO,
                 controls=[
                     input_titulo,
-                    ft.ResponsiveRow([input_data, input_participantes]),
+                    ft.ResponsiveRow([input_data], alignment=ft.MainAxisAlignment.START),
+                    ft.Text("Participantes", weight=ft.FontWeight.BOLD, size=13),
+                    participantes_chips,
+                    ft.ResponsiveRow(
+                        [sugestoes_participantes, campo_novo_participante,
+                         botao_adicionar_participante, botao_adicionar_sugerido],
+                        alignment=ft.MainAxisAlignment.START,
+                    ),
+                    input_participantes,
                     input_texto,
                     contador_decisoes,
                     aviso_ficha,
@@ -350,14 +435,17 @@ def build_atas_view(
             input_data.value = datetime.date.today().strftime("%d/%m/%Y")
             input_participantes.value = ""
             input_texto.value = ""
+            desenhar_participantes()
         else:
             modal_editor.title = ft.Text(f"Ata {reuniao.numero:02d} (rascunho)")
             input_titulo.value = reuniao.titulo
             input_data.value = reuniao.data_reuniao.strftime("%d/%m/%Y")
             input_participantes.value = reuniao.participantes or ""
+            desenhar_participantes()
             input_texto.value = reuniao.texto
         mensagem_editor.value = ""
         aviso_ia.value = ""
+        recarregar_sugestoes()
         recarregar_campos_ficha()
         atualizar_resumo()
         page.show_dialog(modal_editor)
@@ -431,7 +519,49 @@ def build_atas_view(
                 linhas.append(ft.Text(linha if linha.strip() else " ", size=14))
         return linhas
 
+    link_pdf_ata = ft.Button(content="Baixar PDF da ata", icon=ft.Icons.DOWNLOAD, visible=False)
+    mensagem_pdf_ata = ft.Text("", size=12, color=ft.Colors.RED_400)
+
+    async def gerar_pdf_ata(_):
+        ata = buscar_reuniao(ata_visualizada_id)
+        if ata is None:
+            return
+        link_pdf_ata.visible = False
+        mensagem_pdf_ata.color = ft.Colors.AMBER_600
+        mensagem_pdf_ata.value = "Gerando o PDF..."
+        page.update()
+        decisoes = listar_decisoes_reuniao(ata.id)
+        alteracoes = listar_alteracoes_ficha_ata(ata.id)
+        adendos = listar_adendos(ata.id)
+        nome_arquivo = nome_do_arquivo_ata(ata.numero, ata.titulo, datetime.date.today())
+        relativo = f"relatorios/{uuid.uuid4().hex}/{nome_arquivo}"
+        destino = RELATORIOS_DIR.parent / relativo
+        try:
+            await asyncio.to_thread(
+                gerar_ata_pdf, destino, projeto.nome, ata, decisoes, alteracoes, adendos,
+                usuario.nome_completo, NOME_APP,
+            )
+        except Exception as erro:
+            mensagem_pdf_ata.color = ft.Colors.RED_400
+            mensagem_pdf_ata.value = f"Não foi possível gerar o PDF: {erro}"
+            page.update()
+            return
+        limpar_relatorios_antigos()
+        mensagem_pdf_ata.color = ft.Colors.GREEN_400
+        mensagem_pdf_ata.value = "PDF pronto."
+        if page.web:
+            token = assinar_token(segredo_do_servidor(), {"p": relativo}, validade_s=900)
+            link_pdf_ata.url = f"/anexo/{quote(token)}"
+            link_pdf_ata.visible = True
+        else:
+            from views.timeline import abrir_arquivo_nativo
+            abrir_arquivo_nativo(str(destino))
+            mensagem_pdf_ata.value = f"PDF salvo em {destino}"
+        page.update()
+
     def montar_visualizacao():
+        link_pdf_ata.visible = False
+        mensagem_pdf_ata.value = ""
         ata = buscar_reuniao(ata_visualizada_id)
         decisoes = listar_decisoes_reuniao(ata.id)
         adendos = listar_adendos(ata.id)
@@ -514,8 +644,9 @@ def build_atas_view(
                 ]
             )
 
+        controles.append(ft.Row([link_pdf_ata, mensagem_pdf_ata], wrap=True))
         modal_visualizar.content = ft.Container(
-            width=largura_dialogo(page, 700),
+            width=largura_dialogo(page, 800),
             content=ft.Column(tight=True, scroll=ft.ScrollMode.AUTO, controls=controles),
         )
 
@@ -531,6 +662,9 @@ def build_atas_view(
         if ata.status == "Fechada":
             acoes.append(
                 ft.TextButton(content="Ver na linha do tempo", on_click=ver_na_timeline)
+            )
+            acoes.append(
+                ft.Button(content="Gerar PDF", icon=ft.Icons.PICTURE_AS_PDF, on_click=gerar_pdf_ata)
             )
         elif pode_editar:
             acoes.append(ft.TextButton(content="Continuar editando", on_click=editar_rascunho))
