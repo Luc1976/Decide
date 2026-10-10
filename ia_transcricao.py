@@ -187,6 +187,16 @@ Formato:
  "pendencias": ["..."]}"""
 
 
+def _motivo_erro(erro: urllib.error.HTTPError) -> str:
+    """Lê a mensagem que a API devolve junto com o erro (ex.: saldo insuficiente, modelo inválido)."""
+    try:
+        dados = json.loads(erro.read().decode("utf-8"))
+        detalhe = dados.get("error", {})
+        return _uma_linha(detalhe.get("message") or detalhe.get("type") or dados)[:300]
+    except Exception:
+        return "sem detalhes"
+
+
 def _chamar_api(sistema: str, usuario: str, max_tokens: int = 8000) -> str:
     chave = _chave()
     if not chave:
@@ -213,11 +223,15 @@ def _chamar_api(sistema: str, usuario: str, max_tokens: int = 8000) -> str:
         with urllib.request.urlopen(pedido, timeout=180) as resposta:
             dados = json.loads(resposta.read().decode("utf-8"))
     except urllib.error.HTTPError as erro:
+        motivo = _motivo_erro(erro)
+        print(f"[IA] erro {erro.code} da API: {motivo}", flush=True)  # aparece nos logs do Railway
         if erro.code in (401, 403):
             raise ErroIA("A chave da API foi recusada. Confira ANTHROPIC_API_KEY no servidor.")
         if erro.code == 429:
             raise ErroIA("A IA está com muitas solicitações. Tente de novo em alguns minutos.")
-        raise ErroIA(f"A IA respondeu com erro {erro.code}. Tente novamente.")
+        if erro.code == 400:
+            raise ErroIA(f"A API recusou o pedido: {motivo}")
+        raise ErroIA(f"A IA respondeu com erro {erro.code}: {motivo}")
     except (urllib.error.URLError, TimeoutError, OSError):
         raise ErroIA("Não foi possível falar com a IA (rede ou tempo esgotado). Tente novamente.")
     partes = [b.get("text", "") for b in dados.get("content", []) if b.get("type") == "text"]
