@@ -1090,7 +1090,7 @@ def build_timeline_view(
                 alteracao_ficha=alteracao_ficha,
                 usuario_id=usuario.id,
             )
-        except PermissionError as erro:
+        except (PermissionError, ValueError) as erro:
             mensagem_decisao.value = str(erro)
             page.update()
             return
