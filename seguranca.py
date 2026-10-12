@@ -39,6 +39,13 @@ def segredo_do_servidor() -> bytes:
     return carregar_segredo(DATA_DIR)
 
 
+def segredo_uploads_flet() -> str:
+    """Chave que o Flet usa para assinar os links de envio de arquivos (FLET_SECRET_KEY).
+    Derivada do segredo do servidor, para não exigir configuração extra e não reaproveitar
+    a mesma chave dos links de anexos."""
+    return hmac.new(segredo_do_servidor(), b"flet-uploads", hashlib.sha256).hexdigest()
+
+
 def assinar_token(segredo: bytes, dados: dict, validade_s: int = 300, agora: Optional[float] = None) -> str:
     corpo = dict(dados, exp=int((agora if agora is not None else time.time()) + validade_s))
     bruto = base64.urlsafe_b64encode(

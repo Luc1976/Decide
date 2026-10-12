@@ -1,3 +1,5 @@
+import os
+
 import flet as ft
 
 from app import main
@@ -30,6 +32,12 @@ if MODO_WEB:
     print(f"[memoria] Modo site: porta {PORTA}, dados em {DATA_DIR}", flush=True)
     # Site: o Python roda no servidor e o navegador é só a tela. Exportamos o app ASGI
     # (FastAPI) para acrescentar a rota protegida dos anexos e servir com o uvicorn.
+    # O Flet só aceita uploads (anexos e logos) com FLET_SECRET_KEY definida, e a lê ao
+    # montar o servidor. Sem ela no ambiente, usamos uma chave derivada do segredo do app.
+    if not os.getenv("FLET_SECRET_KEY"):
+        from seguranca import segredo_uploads_flet
+
+        os.environ["FLET_SECRET_KEY"] = segredo_uploads_flet()
     try:
         from anexos_web import registrar_rota_anexos
 

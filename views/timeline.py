@@ -291,7 +291,7 @@ def build_timeline_view(
             mensagem_logo_cliente.value = "Processando a imagem..."
             page.update()
             await asyncio.to_thread(salvar_logo_projeto, projeto.id, escolhida[1], usuario)
-        except (ValueError, PermissionError, OSError, TimeoutError) as erro:
+        except (ValueError, PermissionError, OSError, TimeoutError, RuntimeError) as erro:
             mensagem_logo_cliente.color = ft.Colors.RED_400
             mensagem_logo_cliente.value = f"Logo não salvo: {erro}"
         else:
@@ -815,7 +815,7 @@ def build_timeline_view(
             mensagem_logo_empresa.value = "Processando a imagem..."
             page.update()
             await asyncio.to_thread(salvar_logo_empresa, escolhida[1], usuario)
-        except (ValueError, PermissionError, OSError, TimeoutError) as erro:
+        except (ValueError, PermissionError, OSError, TimeoutError, RuntimeError) as erro:
             mensagem_logo_empresa.color = ft.Colors.RED_400
             mensagem_logo_empresa.value = f"Logo não salvo: {erro}"
         else:
