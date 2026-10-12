@@ -7,6 +7,7 @@ from database import autenticar_usuario, init_db, listar_projetos_do_usuario, po
 from views.atas import build_atas_view
 from views.ficha import build_ficha_view
 from views.login import build_login_view
+from views.pendencias import build_pendencias_view
 from views.sem_projeto import build_sem_projeto_view
 from views.timeline import build_timeline_view
 from seguranca import LimitadorTentativas
@@ -44,6 +45,19 @@ def main(page: ft.Page):
                 abrir_atas,
                 abrir_ficha,
                 projeto_excluido,
+                abrir_pendencias,
+            )
+        )
+
+    def montar_pendencias():
+        mostrar_view(
+            build_pendencias_view(
+                page,
+                projeto_ativo,
+                usuario_logado,
+                sair,
+                voltar_timeline,
+                abrir_atas,
             )
         )
 
@@ -121,6 +135,9 @@ def main(page: ft.Page):
     async def abrir_ficha(_=None):
         await page.push_route("/ficha")
 
+    async def abrir_pendencias(_=None):
+        await page.push_route("/pendencias")
+
     async def voltar_timeline(_=None):
         await page.push_route("/timeline")
 
@@ -162,6 +179,8 @@ def main(page: ft.Page):
             montar_atas()
         elif page.route == "/ficha":
             montar_ficha()
+        elif page.route == "/pendencias":
+            montar_pendencias()
         else:
             asyncio.create_task(page.push_route("/timeline"))
 

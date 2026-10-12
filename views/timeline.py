@@ -21,6 +21,7 @@ from database import (
     buscar_decisoes_projeto,
     buscar_reunioes_projeto,
     campos_da_ficha,
+    contar_pendencias_abertas,
     listar_caracteristicas,
     criar_projeto,
     criar_usuario,
@@ -155,6 +156,7 @@ def build_timeline_view(
     on_open_atas=None,
     on_open_ficha=None,
     on_project_deleted=None,
+    on_open_pendencias=None,
 ):
     # O FilePicker é um "service" e pertence à View: é passado em ft.View(services=[...])
     # no return. NÃO use page.services aqui, pois ele exige que page.views não esteja vazia.
@@ -555,6 +557,7 @@ def build_timeline_view(
         texto_exclusao.value = (
             f'Isto apaga DEFINITIVAMENTE o projeto "{projeto.nome}" e tudo o que há nele: '
             f"{resumo['decisoes']} decisão(ões), {resumo['atas']} ata(s), "
+            f"{resumo['pendencias']} pendência(s), "
             f"{resumo['anexos']} anexo(s), a ficha do empreendimento e o acesso de "
             f"{resumo['membros']} membro(s). Não é possível desfazer."
         )
@@ -1450,6 +1453,21 @@ def build_timeline_view(
         if on_open_ficha:
             await on_open_ficha()
 
+    async def abrir_pendencias(_):
+        if on_open_pendencias:
+            await on_open_pendencias()
+
+    btn_pendencias = ft.Button(
+        content=rotulo(page, "Pendências", "Pend."),
+        icon=ft.Icons.PENDING_ACTIONS,
+        on_click=abrir_pendencias,
+    )
+
+    def atualizar_botao_pendencias():
+        """Mostra quantos assuntos aguardam decisão no projeto ativo."""
+        abertas = contar_pendencias_abertas(projeto.id)
+        btn_pendencias.content = rotulo(page, "Pendências", "Pend.") + (f" ({abertas})" if abertas else "")
+
     btn_novo_projeto = ft.Button(
         content=rotulo(page, "+ Novo Projeto", "+ Projeto"),
         icon=ft.Icons.ADD,
@@ -1483,6 +1501,7 @@ def build_timeline_view(
         btn_membros.visible = nivel >= NIVEL_PAPEL["Responsável"]
         btn_excluir_projeto.visible = nivel >= NIVEL_PAPEL["Responsável"]
         btn_nova_decisao.visible = nivel >= NIVEL_PAPEL["Editor"]
+        atualizar_botao_pendencias()
         if usuario.admin:
             acesso_info.value = "Acesso: administrador"
         elif nivel >= NIVEL_PAPEL["Responsável"]:
@@ -1531,6 +1550,7 @@ def build_timeline_view(
                             icon=ft.Icons.GROUPS,
                             on_click=abrir_lista_atas,
                         ),
+                        btn_pendencias,
                         btn_nova_decisao,
                         btn_relatorio,
                         *(

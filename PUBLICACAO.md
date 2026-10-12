@@ -54,13 +54,33 @@ Limites: o PDF usa a fonte padrão (Helvetica). Letras acentuadas e m² funciona
 fora do alfabeto latino viram "?". Esta função exige o pacote `reportlab` (já está no
 `pyproject.toml`; rode `uv lock` de novo antes de publicar).
 
+## Pendências de decisão
+Botão **Pendências** na linha do tempo (o número entre parênteses é quantas estão em aberto).
+Lista os assuntos que ainda aguardam decisão, com responsável, prazo (vencidos aparecem em
+vermelho) e origem.
+
+Como uma pendência entra:
+- **Manualmente**: **+ Nova Pendência** (Editor ou Responsável).
+- **Pelas atas**: no texto da ata, comece a linha com `[P]` (ex.: `[P] Definir fornecedor das
+  esquadrias`). Ao **fechar** a ata, cada linha `[P]` vira uma pendência ligada a ela. O rascunho
+  gerado por IA a partir da transcrição já traz os assuntos sem decisão como linhas `[P]`: revise,
+  apague ou ajuste antes de fechar. A IA também recebe a lista de pendências em aberto, para não
+  repeti-las e para apontar (com o código P-xxx no título da decisão) quando uma delas foi decidida.
+
+Como uma pendência sai:
+- **Resolver**: registra a decisão na hora (vira um D-xxx na linha do tempo) ou liga a uma decisão
+  já registrada.
+- **Cancelar**: quando o assunto deixou de precisar de decisão (pede o motivo).
+Resolvidas e canceladas continuam no histórico (filtro **Situação**) e podem ser reabertas.
+Leitores (clientes) veem a lista, mas não alteram.
+
 ## Acesso e permissões (usuários externos)
 Cada projeto tem seus próprios membros. Ninguém vê projetos dos quais não faz parte.
 
 | Acesso | Quem é | O que pode |
 |---|---|---|
 | **Leitor** | cliente que acompanha | ver decisões, atas **fechadas** (rascunhos ficam ocultos) e a ficha; abrir anexos |
-| **Editor** | equipe / terceiro | tudo do Leitor + registrar decisões e atas, alterar a ficha |
+| **Editor** | equipe / terceiro | tudo do Leitor + registrar decisões, atas e pendências, alterar a ficha |
 | **Responsável** | dono do projeto | tudo do Editor + editar o projeto, gerenciar os membros e **excluir o projeto** |
 | **Administrador** | você | acessa todos os projetos e cadastra usuários |
 

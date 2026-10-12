@@ -17,7 +17,11 @@ from database import (
     campos_da_ficha,
     criar_reuniao,
     extrair_decisoes,
+    extrair_pendencias,
     fechar_reuniao,
+    listar_pendencias,
+    listar_pendencias_reuniao,
+    PENDENCIA_ABERTA,
     listar_adendos,
     listar_alteracoes_ficha_ata,
     listar_decisoes_reuniao,
@@ -34,6 +38,7 @@ CORES_STATUS = {
 }
 DICA_DECISAO = "Comece a linha com [D] para registrar uma decisão."
 DICA_FICHA = "Linha [F] campo = valor altera a ficha (vale para a [D] logo acima)."
+DICA_PENDENCIA = "Linha [P] = assunto que ficou sem decisão (vai para Pendências)."
 
 
 def _texto_decisoes(qtd: int) -> str:
@@ -172,7 +177,7 @@ def build_atas_view(
 
     input_texto = ft.TextField(
         label="Texto da ata",
-        hint_text="Escreva a ata. Linha [D] = decisão. " + DICA_FICHA,
+        hint_text="Escreva a ata. Linha [D] = decisão. " + DICA_FICHA + " " + DICA_PENDENCIA,
         multiline=True,
         min_lines=18,
         max_lines=30,
@@ -199,6 +204,9 @@ def build_atas_view(
             contador_decisoes.value += (
                 f" · {len(alteracoes)} alteração(ões) da ficha"
             )
+        qtd_pendencias = len(extrair_pendencias(input_texto.value))
+        if qtd_pendencias:
+            contador_decisoes.value += f" · {qtd_pendencias} pendência(s)"
         aviso_ficha.value = ("Atenção: " + "; ".join(erros) + ".") if erros else ""
 
     def gravar_rascunho():
@@ -266,6 +274,11 @@ def build_atas_view(
             texto_confirmacao.value += (
                 f" {len(alteracoes)} alteração(ões) serão aplicadas na ficha do empreendimento."
             )
+        qtd_pendencias = len(extrair_pendencias(ata.texto))
+        if qtd_pendencias:
+            texto_confirmacao.value += (
+                f" {qtd_pendencias} assunto(s) [P] entrarão na lista de pendências de decisão."
+            )
         mensagem_confirmacao.value = ""
         page.pop_dialog()
         page.show_dialog(modal_confirmar)
@@ -304,6 +317,10 @@ def build_atas_view(
             recentes = [
                 f"{_codigo(d)} {d.titulo}" for d in buscar_decisoes_projeto(projeto.id, "")
             ]
+            abertas = [
+                f"P-{p.numero:03d} {p.titulo}"
+                for p in listar_pendencias(projeto.id, status=PENDENCIA_ABERTA)
+            ]
             resultado = await asyncio.to_thread(
                 ia_transcricao.gerar_rascunho,
                 input_transcricao.value,
@@ -313,6 +330,8 @@ def build_atas_view(
                 IMPACTOS,
                 list(campos_ficha),
                 recentes,
+                None,
+                abertas,
             )
         except (ia_transcricao.ErroIA, PermissionError) as erro:
             mensagem_importar.color = ft.Colors.RED_400
@@ -507,6 +526,15 @@ def build_atas_view(
                         content=ft.Text(linha.strip(), size=14),
                     )
                 )
+            elif linha.strip().upper().startswith("[P]"):
+                linhas.append(
+                    ft.Container(
+                        padding=6,
+                        border_radius=4,
+                        bgcolor=ft.Colors.ORANGE_900,
+                        content=ft.Text(linha.strip(), size=14),
+                    )
+                )
             elif linha.strip().upper().startswith("[F]"):
                 linhas.append(
                     ft.Container(
@@ -605,6 +633,26 @@ def build_atas_view(
             controles.append(
                 ft.Text("Nenhuma decisão registrada nesta ata.", color=ft.Colors.GREY_400)
             )
+
+        pendencias = listar_pendencias_reuniao(ata.id)
+        if pendencias:
+            controles.append(ft.Divider())
+            controles.append(ft.Text("Pendências registradas nesta ata", weight=ft.FontWeight.BOLD))
+            for pendencia in pendencias:
+                controles.append(
+                    ft.Row(
+                        vertical_alignment=ft.CrossAxisAlignment.START,
+                        controls=[
+                            ft.Text(
+                                f"P-{pendencia.numero:03d}",
+                                weight=ft.FontWeight.BOLD,
+                                color=ft.Colors.ORANGE_300,
+                            ),
+                            ft.Text(pendencia.descricao or pendencia.titulo, expand=True),
+                            ft.Text(pendencia.status, size=12, color=ft.Colors.GREY_400),
+                        ],
+                    )
+                )
 
         alteracoes_ficha = listar_alteracoes_ficha_ata(ata.id)
         if alteracoes_ficha:

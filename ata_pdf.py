@@ -57,6 +57,8 @@ def _linha_texto(linha: str, estilos):
                               ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
                               ("LEFTPADDING", (0, 0), (-1, -1), 6)]),
         )
+    if limpa.upper().startswith("[P]"):
+        return Paragraph(f"<font color='#9A6700'><b>{_p(limpa)}</b></font>", estilos["corpo"])
     if limpa.upper().startswith("[F]"):
         return Paragraph(f"<font color='#1B7F3B'><b>{_p(limpa)}</b></font>", estilos["corpo"])
     return Paragraph(_p(limpa), estilos["corpo"])

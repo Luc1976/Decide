@@ -111,6 +111,32 @@ class Decisao(SQLModel, table=True):
     reuniao_id: Optional[int] = Field(default=None, foreign_key="reuniao.id")  # ata de origem
     numero: Optional[int] = None      # sequencial no projeto (D-001, D-002...)
 
+PENDENCIA_ABERTA, PENDENCIA_RESOLVIDA, PENDENCIA_CANCELADA = "Aberta", "Resolvida", "Cancelada"
+SITUACOES_PENDENCIA = (PENDENCIA_ABERTA, PENDENCIA_RESOLVIDA, PENDENCIA_CANCELADA)
+
+
+class Pendencia(SQLModel, table=True):
+    """Assunto que ainda aguarda decisão. Entra pela tela de pendências ou por uma linha [P]
+    de uma ata fechada. É resolvido ligando-o a uma decisão (existente ou criada na hora)."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    projeto_id: int = Field(foreign_key="projeto.id", index=True)
+    numero: int                        # sequencial no projeto (P-001, P-002...)
+    titulo: str
+    descricao: str = ""
+    categoria: str = "Geral"
+    responsavel: str = ""              # quem precisa decidir / trazer a resposta
+    prazo: Optional[datetime.date] = None
+    status: str = PENDENCIA_ABERTA
+    autor: str = ""
+    data_criacao: datetime.datetime = Field(
+        default_factory=lambda: datetime.datetime.now(datetime.timezone.utc)
+    )
+    reuniao_id: Optional[int] = Field(default=None, foreign_key="reuniao.id")  # ata de origem
+    decisao_id: Optional[int] = Field(default=None, foreign_key="decisao.id")  # decisão que resolveu
+    resolucao: str = ""                # observação ao resolver/cancelar
+    resolvida_por: str = ""
+    data_resolucao: Optional[datetime.datetime] = None
+
 # --- CONFIGURAÇÃO DO BANCO ---
 
 sqlite_file_name = str(DB_PATH)  # pasta definida por MEMORIA_DATA_DIR (ver config.py)
@@ -513,6 +539,7 @@ def listar_decisoes_projeto(projeto_id: int) -> List[Decisao]:
 # --- ATAS DE REUNIÃO ---
 
 _PADRAO_DECISAO = re.compile(r"^\s*\[D\]\s*(.+?)\s*$", re.IGNORECASE)
+_PADRAO_PENDENCIA = re.compile(r"^\s*\[P\]\s*(.+?)\s*$", re.IGNORECASE)
 
 
 def extrair_decisoes(texto: str) -> List[str]:
@@ -523,6 +550,11 @@ def extrair_decisoes(texto: str) -> List[str]:
         if m:
             encontradas.append(m.group(1))
     return encontradas
+
+
+def extrair_pendencias(texto: str) -> List[str]:
+    """Linhas da ata que começam com [P]: assuntos que ficaram sem decisão."""
+    return [m.group(1) for m in map(_PADRAO_PENDENCIA.match, (texto or "").splitlines()) if m]
 
 
 def _titulo_da_linha(linha: str, limite: int = 70) -> str:
@@ -633,6 +665,18 @@ def fechar_reuniao(reuniao_id: int, autor: str, usuario_id: Optional[int] = None
             session.add(dec)
             criadas.append(dec)
 
+        numero_pendencia = _proximo_numero_pendencia(session, reuniao.projeto_id)
+        for linha in extrair_pendencias(reuniao.texto):
+            session.add(Pendencia(
+                projeto_id=reuniao.projeto_id,
+                numero=numero_pendencia,
+                titulo=_titulo_da_linha(linha),
+                descricao=linha,
+                autor=autor,
+                reuniao_id=reuniao.id,
+            ))
+            numero_pendencia += 1
+
         session.flush()  # gera os ids das decisões
         for indice, grupo, nome, unidade, valor in alteracoes_ficha:
             decisao = criadas[indice] if indice is not None else None
@@ -718,6 +762,212 @@ def listar_adendos(reuniao_id: int) -> List[AtaAdendo]:
             select(AtaAdendo)
             .where(AtaAdendo.reuniao_id == reuniao_id)
             .order_by(AtaAdendo.data_registro)
+        ).all()
+
+
+# --- PENDÊNCIAS (assuntos aguardando decisão) ---
+
+def _proximo_numero_pendencia(session: Session, projeto_id: int) -> int:
+    ultimo = session.exec(
+        select(Pendencia.numero)
+        .where(Pendencia.projeto_id == projeto_id)
+        .order_by(Pendencia.numero.desc())
+    ).first()
+    return (ultimo or 0) + 1
+
+
+def _copia(session: Session, objeto):
+    session.refresh(objeto)
+    session.expunge(objeto)
+    return objeto
+
+
+def criar_pendencia(
+    projeto_id: int,
+    titulo: str,
+    descricao: str = "",
+    categoria: str = "Geral",
+    responsavel: str = "",
+    prazo: Optional[datetime.date] = None,
+    autor: str = "",
+    usuario_id: Optional[int] = None,
+) -> Pendencia:
+    titulo = (titulo or "").strip()
+    if not titulo:
+        raise ValueError("Informe o assunto pendente.")
+    with Session(engine) as session:
+        _exigir(session, usuario_id, projeto_id, "Editor")
+        pendencia = Pendencia(
+            projeto_id=projeto_id,
+            numero=_proximo_numero_pendencia(session, projeto_id),
+            titulo=titulo,
+            descricao=(descricao or "").strip(),
+            categoria=categoria or "Geral",
+            responsavel=(responsavel or "").strip(),
+            prazo=prazo,
+            autor=autor,
+        )
+        session.add(pendencia)
+        session.commit()
+        return _copia(session, pendencia)
+
+
+def _pendencia_para_alterar(session: Session, pendencia_id: int, usuario_id: Optional[int]) -> Pendencia:
+    pendencia = session.get(Pendencia, pendencia_id)
+    if pendencia is None:
+        raise ValueError("Pendência não encontrada.")
+    _exigir(session, usuario_id, pendencia.projeto_id, "Editor")
+    return pendencia
+
+
+def atualizar_pendencia(
+    pendencia_id: int,
+    titulo: str,
+    descricao: str,
+    categoria: str,
+    responsavel: str,
+    prazo: Optional[datetime.date],
+    usuario_id: Optional[int] = None,
+) -> Pendencia:
+    titulo = (titulo or "").strip()
+    if not titulo:
+        raise ValueError("Informe o assunto pendente.")
+    with Session(engine) as session:
+        pendencia = _pendencia_para_alterar(session, pendencia_id, usuario_id)
+        if pendencia.status != PENDENCIA_ABERTA:
+            raise ValueError("Só pendências em aberto podem ser editadas. Reabra-a primeiro.")
+        pendencia.titulo = titulo
+        pendencia.descricao = (descricao or "").strip()
+        pendencia.categoria = categoria or "Geral"
+        pendencia.responsavel = (responsavel or "").strip()
+        pendencia.prazo = prazo
+        session.add(pendencia)
+        session.commit()
+        return _copia(session, pendencia)
+
+
+def resolver_pendencia(
+    pendencia_id: int,
+    autor: str,
+    usuario_id: Optional[int] = None,
+    decisao_id: Optional[int] = None,
+    nova_decisao: Optional[dict] = None,
+    observacao: str = "",
+) -> Pendencia:
+    """Marca a pendência como resolvida, ligada a uma decisão:
+    - decisao_id: decisão já registrada no mesmo projeto; ou
+    - nova_decisao: {"titulo", "descricao", "categoria", "impacto", "justificativa"} cria a
+      decisão (D-xxx) na mesma transação."""
+    with Session(engine) as session:
+        pendencia = _pendencia_para_alterar(session, pendencia_id, usuario_id)
+        if pendencia.status != PENDENCIA_ABERTA:
+            raise ValueError("Esta pendência não está em aberto.")
+        if nova_decisao is not None:
+            titulo = (nova_decisao.get("titulo") or "").strip()
+            if not titulo:
+                raise ValueError("Informe o título da decisão.")
+            descricao = (nova_decisao.get("descricao") or "").strip() or titulo
+            decisao = Decisao(
+                projeto_id=pendencia.projeto_id,
+                titulo=titulo,
+                categoria=nova_decisao.get("categoria") or pendencia.categoria or "Geral",
+                descricao=descricao,
+                justificativa=(nova_decisao.get("justificativa") or "").strip()
+                or f"Resolve a pendência P-{pendencia.numero:03d} - {pendencia.titulo}",
+                impacto=nova_decisao.get("impacto") or "Médio",
+                autor=autor,
+                numero=_proximo_numero_decisao(session, pendencia.projeto_id),
+            )
+            session.add(decisao)
+            session.flush()
+            decisao_id = decisao.id
+        elif decisao_id is not None:
+            decisao = session.get(Decisao, decisao_id)
+            if decisao is None or decisao.projeto_id != pendencia.projeto_id:
+                raise ValueError("Escolha uma decisão deste projeto.")
+        else:
+            raise ValueError("Escolha a decisão que resolve a pendência.")
+        pendencia.status = PENDENCIA_RESOLVIDA
+        pendencia.decisao_id = decisao_id
+        pendencia.resolucao = (observacao or "").strip()
+        pendencia.resolvida_por = autor
+        pendencia.data_resolucao = datetime.datetime.now(datetime.timezone.utc)
+        session.add(pendencia)
+        session.commit()
+        return _copia(session, pendencia)
+
+
+def cancelar_pendencia(pendencia_id: int, motivo: str, autor: str, usuario_id: Optional[int] = None) -> Pendencia:
+    """Assunto que deixou de precisar de decisão. Fica no histórico (não é apagado)."""
+    motivo = (motivo or "").strip()
+    if not motivo:
+        raise ValueError("Informe o motivo do cancelamento.")
+    with Session(engine) as session:
+        pendencia = _pendencia_para_alterar(session, pendencia_id, usuario_id)
+        if pendencia.status != PENDENCIA_ABERTA:
+            raise ValueError("Esta pendência não está em aberto.")
+        pendencia.status = PENDENCIA_CANCELADA
+        pendencia.resolucao = motivo
+        pendencia.resolvida_por = autor
+        pendencia.data_resolucao = datetime.datetime.now(datetime.timezone.utc)
+        session.add(pendencia)
+        session.commit()
+        return _copia(session, pendencia)
+
+
+def reabrir_pendencia(pendencia_id: int, usuario_id: Optional[int] = None) -> Pendencia:
+    """Volta a pendência para 'Aberta'. A decisão ligada (se houver) continua registrada."""
+    with Session(engine) as session:
+        pendencia = _pendencia_para_alterar(session, pendencia_id, usuario_id)
+        pendencia.status = PENDENCIA_ABERTA
+        pendencia.decisao_id = None
+        pendencia.resolucao = ""
+        pendencia.resolvida_por = ""
+        pendencia.data_resolucao = None
+        session.add(pendencia)
+        session.commit()
+        return _copia(session, pendencia)
+
+
+def listar_pendencias(projeto_id: int, status: Optional[str] = None, termo: str = "") -> List[Pendencia]:
+    """Pendências do projeto: em aberto primeiro (prazo mais próximo antes), depois as demais.
+    'termo' filtra por assunto, detalhes, responsável ou categoria (sem acentos)."""
+    with Session(engine) as session:
+        consulta = select(Pendencia).where(Pendencia.projeto_id == projeto_id)
+        if status:
+            consulta = consulta.where(Pendencia.status == status)
+        pendencias = session.exec(consulta).all()
+    termo_busca = _normalizar(termo)
+    if termo_busca:
+        pendencias = [
+            p for p in pendencias
+            if termo_busca in _normalizar(" ".join([p.titulo, p.descricao, p.responsavel, p.categoria]))
+        ]
+    abertas = sorted(
+        (p for p in pendencias if p.status == PENDENCIA_ABERTA),
+        key=lambda p: (p.prazo is None, p.prazo or datetime.date.max, p.numero),
+    )
+    encerradas = sorted(
+        (p for p in pendencias if p.status != PENDENCIA_ABERTA),
+        key=lambda p: (p.data_resolucao or datetime.datetime.min, p.numero),
+        reverse=True,
+    )
+    return abertas + encerradas
+
+
+def contar_pendencias_abertas(projeto_id: int) -> int:
+    with Session(engine) as session:
+        return len(session.exec(
+            select(Pendencia.id).where(
+                Pendencia.projeto_id == projeto_id, Pendencia.status == PENDENCIA_ABERTA
+            )
+        ).all())
+
+
+def listar_pendencias_reuniao(reuniao_id: int) -> List[Pendencia]:
+    with Session(engine) as session:
+        return session.exec(
+            select(Pendencia).where(Pendencia.reuniao_id == reuniao_id).order_by(Pendencia.numero)
         ).all()
 
 
@@ -858,7 +1108,9 @@ def resumo_projeto(projeto_id: int, usuario_id: int) -> dict:
         atas = session.exec(select(Reuniao).where(Reuniao.projeto_id == projeto_id)).all()
         membros = session.exec(select(MembroProjeto).where(MembroProjeto.projeto_id == projeto_id)).all()
         anexos = sum(len([c for c in (d.anexos or "").split(",") if c]) for d in decisoes)
-        return {"decisoes": len(decisoes), "atas": len(atas), "anexos": anexos, "membros": len(membros)}
+        pendencias = session.exec(select(Pendencia.id).where(Pendencia.projeto_id == projeto_id)).all()
+        return {"decisoes": len(decisoes), "atas": len(atas), "anexos": anexos,
+                "membros": len(membros), "pendencias": len(pendencias)}
 
 
 def excluir_projeto(projeto_id: int, usuario_id: int) -> list:
@@ -888,7 +1140,8 @@ def excluir_projeto(projeto_id: int, usuario_id: int) -> list:
         padroes = session.exec(
             select(PadraoConstrutivo).where(PadraoConstrutivo.projeto_id == projeto_id)
         ).all()
-        for item in [*historico, *caracteristicas, *padroes]:
+        pendencias = session.exec(select(Pendencia).where(Pendencia.projeto_id == projeto_id)).all()
+        for item in [*historico, *caracteristicas, *padroes, *pendencias]:
             session.delete(item)
         session.flush()
         for reuniao in reunioes:
