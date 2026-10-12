@@ -41,6 +41,15 @@ categoria e impacto, a ficha com os indicadores calculados e as decisões em ord
 No site, depois de gerar toque em **Baixar PDF** (o link vale 15 minutos). Os arquivos ficam em
 `/dados/relatorios` e são apagados automaticamente depois de 24 horas.
 
+**Logotipos no cabeçalho**: o relatório e o PDF das atas trazem, no alto de todas as páginas, o
+logo da empresa (à esquerda) e o logo do cliente do projeto (à direita), quando cadastrados.
+- Logo da empresa: botão com ícone de prédio no topo da tela (só administradores). Vale para
+  todos os projetos.
+- Logo do cliente: **Editar Projeto** → "Logo do cliente" (Responsável pelo projeto).
+
+Aceita PNG, JPG, WEBP, GIF ou BMP de até 5 MB; a imagem é reduzida e guardada como PNG em
+`/dados/logos`. PNG com fundo transparente fica melhor. Sem logos, o PDF sai como antes.
+
 Limites: o PDF usa a fonte padrão (Helvetica). Letras acentuadas e m² funcionam; emojis e símbolos
 fora do alfabeto latino viram "?". Esta função exige o pacote `reportlab` (já está no
 `pyproject.toml`; rode `uv lock` de novo antes de publicar).

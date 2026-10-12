@@ -114,8 +114,56 @@ def _tabela_chave_valor(linhas, estilos, larguras=(5.2 * cm, 11.8 * cm)):
     return tabela
 
 
-def _canvas_com_rodape(texto_esquerda: str):
-    """Canvas que escreve 'Página X de Y' (precisa saber o total, então grava as páginas antes)."""
+# Cabeçalho com logotipos: logo da empresa à esquerda, logo do cliente à direita.
+ALTURA_LOGO = 1.5 * cm
+LARGURA_MAX_LOGO = 6 * cm
+TOPO_LOGO = 1.0 * cm  # distância do topo da folha até o alto dos logos
+
+
+def _ler_logos(logo_empresa=None, logo_cliente=None):
+    """(ImageReader ou None, ImageReader ou None). Imagem ausente ou ilegível é ignorada:
+    um logo com problema nunca impede o PDF de sair."""
+    from reportlab.lib.utils import ImageReader
+
+    def ler(caminho):
+        if not caminho or not Path(caminho).is_file():
+            return None
+        try:
+            imagem = ImageReader(str(caminho))
+            imagem.getSize()
+            return imagem
+        except Exception:
+            return None
+
+    return ler(logo_empresa), ler(logo_cliente)
+
+
+def margem_superior(logos, padrao=2 * cm) -> float:
+    """Com logos, o texto começa abaixo do cabeçalho; sem eles, fica como antes."""
+    return TOPO_LOGO + ALTURA_LOGO + 0.9 * cm if any(logos or ()) else padrao
+
+
+def _desenhar_logos(tela, logos, largura_pagina, altura_pagina) -> None:
+    empresa, cliente = logos
+    if not (empresa or cliente):
+        return
+    base = altura_pagina - TOPO_LOGO - ALTURA_LOGO
+    for imagem, alinhar_direita in ((empresa, False), (cliente, True)):
+        if imagem is None:
+            continue
+        largura, altura = imagem.getSize()
+        escala = min(ALTURA_LOGO / altura, LARGURA_MAX_LOGO / largura)
+        w, h = largura * escala, altura * escala
+        x = largura_pagina - 2 * cm - w if alinhar_direita else 2 * cm
+        y = base + (ALTURA_LOGO - h) / 2  # centraliza na faixa do cabeçalho
+        tela.drawImage(imagem, x, y, width=w, height=h, mask="auto")
+    tela.setStrokeColor(colors.HexColor("#D5DAE1"))
+    tela.line(2 * cm, base - 0.3 * cm, largura_pagina - 2 * cm, base - 0.3 * cm)
+
+
+def _canvas_com_rodape(texto_esquerda: str, logos=(None, None)):
+    """Canvas que escreve 'Página X de Y' (precisa saber o total, então grava as páginas antes)
+    e, se houver, os logotipos no cabeçalho de todas as páginas."""
 
     class _Numerado(canvas.Canvas):
         def __init__(self, *args, **kwargs):
@@ -130,6 +178,7 @@ def _canvas_com_rodape(texto_esquerda: str):
             total = len(self._estados)
             for estado in self._estados:
                 self.__dict__.update(estado)
+                _desenhar_logos(self, logos, *self._pagesize)
                 self.setFont("Helvetica", 8)
                 self.setFillColor(CINZA)
                 self.drawString(2 * cm, 1.2 * cm, _limpo(texto_esquerda)[:95])
@@ -237,10 +286,14 @@ def gerar_relatorio_pdf(
     incluir_detalhes: bool = True,
     nome_app: str = "Memória de Projetos",
     agora: datetime = None,
+    logo_empresa=None,
+    logo_cliente=None,
 ) -> int:
-    """Grava o PDF em 'destino' e devolve quantas decisões entraram."""
+    """Grava o PDF em 'destino' e devolve quantas decisões entraram.
+    logo_empresa / logo_cliente: caminhos de imagens para o cabeçalho (opcionais)."""
     agora = agora or datetime.now()
     estilos = _estilos()
+    logos = _ler_logos(logo_empresa, logo_cliente)
     decisoes = sorted(decisoes, key=lambda d: (d.data_decisao, d.numero or 0, d.id or 0))
 
     story = [
@@ -282,8 +335,8 @@ def gerar_relatorio_pdf(
     destino = Path(destino)
     destino.parent.mkdir(parents=True, exist_ok=True)
     documento = SimpleDocTemplate(
-        str(destino), pagesize=A4, leftMargin=2 * cm, rightMargin=2 * cm, topMargin=2 * cm, bottomMargin=2.3 * cm,
+        str(destino), pagesize=A4, leftMargin=2 * cm, rightMargin=2 * cm, topMargin=margem_superior(logos), bottomMargin=2.3 * cm,
         title=_limpo(f"Relatório de Decisões - {projeto.nome}"), author=_limpo(gerado_por), subject=_limpo(nome_app),
     )
-    documento.build(story, canvasmaker=_canvas_com_rodape(f"{nome_app}  |  {projeto.nome}"))
+    documento.build(story, canvasmaker=_canvas_com_rodape(f"{nome_app}  |  {projeto.nome}", logos))
     return len(decisoes)

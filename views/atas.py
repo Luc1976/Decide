@@ -25,6 +25,7 @@ from database import (
 )
 from models import CATEGORIAS, IMPACTOS, NIVEL_PAPEL
 from layout import col, largura_dialogo, opcoes_dialogo
+from logos import logo_empresa, logo_projeto
 from ficha_calculos import analisar_alteracoes_ata
 
 CORES_STATUS = {
@@ -539,7 +540,7 @@ def build_atas_view(
         try:
             await asyncio.to_thread(
                 gerar_ata_pdf, destino, projeto.nome, ata, decisoes, alteracoes, adendos,
-                usuario.nome_completo, NOME_APP,
+                usuario.nome_completo, NOME_APP, logo_empresa(), logo_projeto(projeto.id),
             )
         except Exception as erro:
             mensagem_pdf_ata.color = ft.Colors.RED_400

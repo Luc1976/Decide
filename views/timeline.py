@@ -37,6 +37,15 @@ from database import (
 )
 from config import NOME_APP, RELATORIOS_DIR, UPLOAD_DIR, apagar_anexos, limpar_relatorios_antigos
 from layout import col, largura_dialogo, opcoes_dialogo, rotulo
+from logos import (
+    EXTENSOES as EXTENSOES_LOGO,
+    logo_empresa,
+    logo_projeto,
+    remover_logo_empresa,
+    remover_logo_projeto,
+    salvar_logo_empresa,
+    salvar_logo_projeto,
+)
 from models import CATEGORIAS, IMPACTOS, NIVEL_PAPEL, PAPEIS
 from seguranca import assinar_token, segredo_do_servidor
 
@@ -78,6 +87,54 @@ async def _aguardar_upload(destino, tamanho_esperado, tempo_maximo=180):
                 return True
         await asyncio.sleep(0.3)
     return False
+
+
+async def ler_imagem_escolhida(page, file_picker):
+    """Abre o seletor de imagens e devolve (nome, bytes) da imagem escolhida, ou None.
+    No site, o navegador envia o arquivo para uma pasta temporária em UPLOAD_DIR; ele é
+    lido e apagado em seguida (o logo definitivo é gravado por logos.py)."""
+    arquivos = await file_picker.pick_files(
+        file_type=ft.FilePickerFileType.CUSTOM,
+        allowed_extensions=EXTENSOES_LOGO,
+        allow_multiple=False,
+        with_data=not page.web,
+    )
+    if not arquivos:
+        return None
+    arquivo = arquivos[0]
+    if not page.web:
+        if arquivo.bytes is not None:
+            return arquivo.name, arquivo.bytes
+        if arquivo.path and os.path.isfile(arquivo.path):
+            return arquivo.name, Path(arquivo.path).read_bytes()
+        raise ValueError("Não foi possível ler o arquivo escolhido.")
+    relativo = f"{uuid.uuid4().hex}/logo-{uuid.uuid4().hex[:8]}"
+    destino = UPLOAD_DIR / relativo
+    try:
+        await file_picker.upload(
+            [
+                ft.FilePickerUploadFile(
+                    id=arquivo.id, name=arquivo.name, upload_url=page.get_upload_url(relativo, 600)
+                )
+            ]
+        )
+        if not await _aguardar_upload(destino, arquivo.size, tempo_maximo=60):
+            raise TimeoutError("o envio da imagem não terminou")
+        return arquivo.name, destino.read_bytes()
+    finally:
+        apagar_anexos([f"uploads/{relativo}"])  # temporário: sai do disco de qualquer jeito
+
+
+def _miniatura_logo(caminho):
+    """Pré-visualização do logo na tela (ou um aviso, se ainda não houver)."""
+    if caminho is None:
+        return ft.Text("Nenhum logo cadastrado.", size=12, color=ft.Colors.GREY_400, italic=True)
+    return ft.Container(
+        content=ft.Image(src=caminho.read_bytes(), height=60, fit=ft.BoxFit.CONTAIN),
+        bgcolor=ft.Colors.WHITE,  # como no PDF: logo sobre fundo branco
+        padding=8,
+        border_radius=6,
+    )
 
 
 def _converter_data(texto):
@@ -212,12 +269,56 @@ def build_timeline_view(
         label="Descrição", multiline=True, min_lines=2
     )
     mensagem_edicao = ft.Text("", color=ft.Colors.RED_400)
+    # Logo do cliente: salvo na hora em que é enviado/removido (não depende do "Salvar").
+    area_logo_cliente = ft.Container()
+    mensagem_logo_cliente = ft.Text("", size=12)
+    btn_remover_logo_cliente = ft.TextButton(content="Remover logo", icon=ft.Icons.DELETE_OUTLINE)
+
+    def desenhar_logo_cliente():
+        atual = logo_projeto(projeto.id)
+        area_logo_cliente.content = _miniatura_logo(atual)
+        btn_remover_logo_cliente.visible = atual is not None
+
+    async def enviar_logo_cliente(_):
+        mensagem_logo_cliente.color = ft.Colors.AMBER_600
+        mensagem_logo_cliente.value = ""
+        try:
+            escolhida = await ler_imagem_escolhida(page, file_picker)
+            if escolhida is None:
+                return
+            mensagem_logo_cliente.value = "Processando a imagem..."
+            page.update()
+            await asyncio.to_thread(salvar_logo_projeto, projeto.id, escolhida[1], usuario)
+        except (ValueError, PermissionError, OSError, TimeoutError) as erro:
+            mensagem_logo_cliente.color = ft.Colors.RED_400
+            mensagem_logo_cliente.value = f"Logo não salvo: {erro}"
+        else:
+            mensagem_logo_cliente.color = ft.Colors.GREEN_400
+            mensagem_logo_cliente.value = "Logo do cliente salvo. Já vale para os próximos PDFs."
+            desenhar_logo_cliente()
+        page.update()
+
+    def remover_logo_cliente(_):
+        try:
+            remover_logo_projeto(projeto.id, usuario)
+        except PermissionError as erro:
+            mensagem_logo_cliente.color = ft.Colors.RED_400
+            mensagem_logo_cliente.value = str(erro)
+        else:
+            mensagem_logo_cliente.color = ft.Colors.GREEN_400
+            mensagem_logo_cliente.value = "Logo do cliente removido."
+            desenhar_logo_cliente()
+        page.update()
+
+    btn_remover_logo_cliente.on_click = remover_logo_cliente
 
     def abrir_edicao_projeto(_):
         input_edit_nome.value = projeto.nome
         input_edit_cliente.value = projeto.cliente
         input_edit_descricao.value = projeto.descricao or ""
         mensagem_edicao.value = ""
+        mensagem_logo_cliente.value = ""
+        desenhar_logo_cliente()
         page.show_dialog(modal_edicao_projeto)
 
     async def salvar_edicao_projeto(_):
@@ -245,11 +346,33 @@ def build_timeline_view(
             width=largura_dialogo(page, 500),
             content=ft.Column(
                 tight=True,
+                scroll=ft.ScrollMode.AUTO,
                 controls=[
                     input_edit_nome,
                     input_edit_cliente,
                     input_edit_descricao,
                     mensagem_edicao,
+                    ft.Divider(),
+                    ft.Text("Logo do cliente", weight=ft.FontWeight.BOLD),
+                    ft.Text(
+                        "Aparece no canto direito do cabeçalho do relatório e das atas em PDF. "
+                        "PNG ou JPG, até 5 MB (PNG com fundo transparente fica melhor).",
+                        size=12,
+                        color=ft.Colors.GREY_400,
+                    ),
+                    area_logo_cliente,
+                    ft.Row(
+                        wrap=True,
+                        controls=[
+                            ft.Button(
+                                content="Enviar imagem",
+                                icon=ft.Icons.UPLOAD,
+                                on_click=enviar_logo_cliente,
+                            ),
+                            btn_remover_logo_cliente,
+                        ],
+                    ),
+                    mensagem_logo_cliente,
                 ],
             ),
         ),
@@ -364,6 +487,9 @@ def build_timeline_view(
                 bool(rel_incluir_ficha.value),
                 bool(rel_incluir_detalhes.value),
                 NOME_APP,
+                None,
+                logo_empresa(),
+                logo_projeto(projeto.id),
             )
         except Exception as erro:
             rel_mensagem.color = ft.Colors.RED_400
@@ -449,6 +575,7 @@ def build_timeline_view(
             page.update()
             return
         apagar_anexos(caminhos)  # o banco já confirmou: agora os arquivos saem do disco
+        remover_logo_projeto(projeto.id)  # o id pode ser reaproveitado por um projeto novo
         page.pop_dialog()
         page.update()
         await asyncio.sleep(0.2)
@@ -657,6 +784,81 @@ def build_timeline_view(
         actions=[
             ft.TextButton(content="Fechar", on_click=lambda _: page.pop_dialog()),
             ft.Button(content="Dar acesso", on_click=salvar_membro),
+        ],
+    )
+
+    # ---------- Logo da empresa (somente administradores) ----------
+    area_logo_empresa = ft.Container()
+    mensagem_logo_empresa = ft.Text("", size=12)
+    btn_remover_logo_empresa = ft.TextButton(content="Remover logo", icon=ft.Icons.DELETE_OUTLINE)
+
+    def desenhar_logo_empresa():
+        atual = logo_empresa()
+        area_logo_empresa.content = _miniatura_logo(atual)
+        btn_remover_logo_empresa.visible = atual is not None
+
+    def abrir_logo_empresa(_):
+        mensagem_logo_empresa.value = ""
+        desenhar_logo_empresa()
+        page.show_dialog(modal_logo_empresa)
+
+    async def enviar_logo_empresa(_):
+        mensagem_logo_empresa.color = ft.Colors.AMBER_600
+        mensagem_logo_empresa.value = ""
+        try:
+            escolhida = await ler_imagem_escolhida(page, file_picker)
+            if escolhida is None:
+                return
+            mensagem_logo_empresa.value = "Processando a imagem..."
+            page.update()
+            await asyncio.to_thread(salvar_logo_empresa, escolhida[1], usuario)
+        except (ValueError, PermissionError, OSError, TimeoutError) as erro:
+            mensagem_logo_empresa.color = ft.Colors.RED_400
+            mensagem_logo_empresa.value = f"Logo não salvo: {erro}"
+        else:
+            mensagem_logo_empresa.color = ft.Colors.GREEN_400
+            mensagem_logo_empresa.value = "Logo da empresa salvo. Já vale para os próximos PDFs."
+            desenhar_logo_empresa()
+        page.update()
+
+    def remover_logo_da_empresa(_):
+        try:
+            remover_logo_empresa(usuario)
+        except PermissionError as erro:
+            mensagem_logo_empresa.color = ft.Colors.RED_400
+            mensagem_logo_empresa.value = str(erro)
+        else:
+            mensagem_logo_empresa.color = ft.Colors.GREEN_400
+            mensagem_logo_empresa.value = "Logo da empresa removido."
+            desenhar_logo_empresa()
+        page.update()
+
+    btn_remover_logo_empresa.on_click = remover_logo_da_empresa
+
+    modal_logo_empresa = ft.AlertDialog(
+        **opcoes_dialogo(page),
+        title=ft.Text("Logo da empresa"),
+        content=ft.Container(
+            width=largura_dialogo(page, 460),
+            content=ft.Column(
+                tight=True,
+                controls=[
+                    ft.Text(
+                        "Aparece no canto esquerdo do cabeçalho de todos os relatórios e atas "
+                        "em PDF, em todos os projetos. PNG ou JPG, até 5 MB (PNG com fundo "
+                        "transparente fica melhor).",
+                        size=12,
+                        color=ft.Colors.GREY_400,
+                    ),
+                    area_logo_empresa,
+                    mensagem_logo_empresa,
+                ],
+            ),
+        ),
+        actions=[
+            btn_remover_logo_empresa,
+            ft.TextButton(content="Fechar", on_click=lambda _: page.pop_dialog()),
+            ft.Button(content="Enviar imagem", icon=ft.Icons.UPLOAD, on_click=enviar_logo_empresa),
         ],
     )
 
@@ -1337,7 +1539,12 @@ def build_timeline_view(
                                     content="Usuários",
                                     icon=ft.Icons.GROUP_ADD,
                                     on_click=abrir_usuarios,
-                                )
+                                ),
+                                ft.IconButton(
+                                    icon=ft.Icons.BUSINESS,
+                                    tooltip="Logo da empresa (cabeçalho dos PDFs)",
+                                    on_click=abrir_logo_empresa,
+                                ),
                             ]
                             if usuario.admin
                             else []
