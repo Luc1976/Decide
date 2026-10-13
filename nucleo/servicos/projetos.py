@@ -7,7 +7,7 @@ from models import NIVEL_PAPEL, PAPEIS
 from nucleo import auditoria
 from nucleo.ator import Ator
 from nucleo.erros import NaoEncontrado, SemPermissao
-from nucleo.permissoes import LEITOR, RESPONSAVEL, exigir
+from nucleo.permissoes import LEITOR, RESPONSAVEL, exigir, organizacao_ativa
 from nucleo.tabelas import (
     AtaAdendo,
     Caracteristica,
@@ -32,16 +32,18 @@ def _validar(nome: str, cliente: str) -> Tuple[str, str]:
 # ---------------------------------------------------------------- leitura
 
 def listar_do_usuario(s: Session, ator: Ator) -> List[Projeto]:
-    """Só os projetos que o ator pode ver (administrador vê todos)."""
+    """Só os projetos que o ator pode ver, sempre dentro da organização dele
+    (o administrador vê todos os projetos DA SUA organização)."""
     usuario = s.get(Usuario, ator.id) if ator.id is not None else None
-    if usuario is None:
+    if usuario is None or not organizacao_ativa(s, usuario.organizacao_id):
         return []
-    if usuario.admin:
-        return list(s.exec(select(Projeto).order_by(Projeto.nome)).all())
-    ids = s.exec(select(MembroProjeto.projeto_id).where(MembroProjeto.usuario_id == ator.id)).all()
-    if not ids:
-        return []
-    return list(s.exec(select(Projeto).where(Projeto.id.in_(ids)).order_by(Projeto.nome)).all())
+    consulta = select(Projeto).where(Projeto.organizacao_id == usuario.organizacao_id)
+    if not usuario.admin:
+        ids = s.exec(select(MembroProjeto.projeto_id).where(MembroProjeto.usuario_id == ator.id)).all()
+        if not ids:
+            return []
+        consulta = consulta.where(Projeto.id.in_(ids))
+    return list(s.exec(consulta.order_by(Projeto.nome)).all())
 
 
 def obter(s: Session, ator: Ator, projeto_id: int) -> Projeto:
@@ -57,7 +59,10 @@ def criar(s: Session, ator: Ator, nome: str, cliente: str, descricao: Optional[s
     criador = s.get(Usuario, ator.id) if ator.id is not None else None
     if criador is None or not (criador.admin or criador.pode_criar_projetos):
         raise SemPermissao("Seu usuário não pode criar projetos.")
-    projeto = Projeto(nome=nome, cliente=cliente, descricao=(descricao or "").strip() or None)
+    if not organizacao_ativa(s, criador.organizacao_id):
+        raise SemPermissao("Seu usuário não está ligado a uma organização ativa.")
+    projeto = Projeto(nome=nome, cliente=cliente, descricao=(descricao or "").strip() or None,
+                      organizacao_id=criador.organizacao_id)
     s.add(projeto)
     s.flush()  # gera o id
     if not criador.admin:
@@ -174,7 +179,8 @@ def definir_membro(s: Session, ator: Ator, projeto_id: int, username: str, papel
         raise ValueError("Escolha o tipo de acesso.")
     exigir(s, ator, projeto_id, RESPONSAVEL)
     alvo = s.exec(select(Usuario).where(Usuario.username == (username or "").strip().lower())).first()
-    if alvo is None:
+    # Usuário de outra organização é tratado como inexistente (não revela quem existe).
+    if alvo is None or alvo.organizacao_id != s.get(Projeto, projeto_id).organizacao_id:
         raise NaoEncontrado(
             "Usuário não encontrado. O cadastro de novos usuários é feito pelo administrador."
         )

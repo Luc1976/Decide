@@ -3,8 +3,10 @@
 Movidas de database.py e models.py sem mudar nenhuma coluna: o banco existente continua
 valendo. database.py e models.py reexportam estas classes, então as telas Flet não mudam.
 
-Mudanças de esquema planejadas (exigem migração com Alembic; ver docs/ARQUITETURA_API.md):
-- Organizacao + organizacao_id em Usuario e Projeto (isolamento entre clientes do SaaS);
+Toda mudança aqui precisa de uma migração em migracoes/versions/ (Alembic). O teste
+tests/test_migracoes.py falha se o modelo e as migrações divergirem.
+
+Mudanças de esquema ainda planejadas (ver docs/ARQUITETURA_API.md):
 - autor_id (FK usuario) ao lado dos campos 'autor' em texto;
 - tabela Anexo no lugar do texto 'anexos' separado por vírgula;
 - índice único (projeto_id, numero) em Decisao, Reuniao e Pendencia.
@@ -20,15 +22,30 @@ def _agora() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc)
 
 
+# ---------------------------------------------------------------- organizações (SaaS)
+
+class Organizacao(SQLModel, table=True):
+    """O escritório assinante. Usuários e projetos pertencem a uma organização, e nada
+    atravessa essa fronteira: nem projetos, nem usuários, nem logos, nem auditoria."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    nome: str
+    slug: str = Field(unique=True, index=True)   # identificador curto (ex.: "rua-estudio")
+    ativa: bool = Field(default=True)            # desativada = ninguém dela entra
+    data_criacao: datetime.datetime = Field(default_factory=_agora)
+
+
 # ---------------------------------------------------------------- usuários e acesso
 
 class Usuario(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    username: str = Field(unique=True)
+    username: str = Field(unique=True)          # único na plataforma toda (é o login)
     senha: str
     nome_completo: str
-    admin: bool = Field(default=False)
+    admin: bool = Field(default=False)          # administrador DA SUA organização
     pode_criar_projetos: bool = Field(default=True)  # False = cliente (só acompanha)
+    organizacao_id: Optional[int] = Field(default=None, foreign_key="organizacao.id", index=True)
+    # Dono da plataforma: cria e desativa organizações. NÃO dá acesso aos projetos delas.
+    superadmin: bool = Field(default=False)
 
 
 class MembroProjeto(SQLModel, table=True):
@@ -47,6 +64,8 @@ class Projeto(SQLModel, table=True):
     cliente: str
     descricao: Optional[str] = None
     data_criacao: datetime.datetime = Field(default_factory=_agora)
+    # Sem organização, o projeto fica inacessível (falha segura). Os serviços sempre preenchem.
+    organizacao_id: Optional[int] = Field(default=None, foreign_key="organizacao.id", index=True)
 
 
 class Caracteristica(SQLModel, table=True):
@@ -198,6 +217,7 @@ class RegistroAuditoria(SQLModel, table=True):
     Tabela nova: create_all a cria em bancos existentes sem mexer nas outras."""
     id: Optional[int] = Field(default=None, primary_key=True)
     momento: datetime.datetime = Field(default_factory=_agora, index=True)
+    organizacao_id: Optional[int] = Field(default=None, index=True)  # sem FK: o registro sobrevive
     usuario_id: Optional[int] = Field(default=None, index=True)
     usuario_nome: str = ""
     acao: str = Field(index=True)          # ex.: "decisao.criar", "ata.fechar", "projeto.excluir"

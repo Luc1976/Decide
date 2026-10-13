@@ -46,6 +46,7 @@ class AuditoriaSaida(Saida):
     momento: datetime.datetime
     usuario_nome: str
     acao: str
+    projeto_id: Optional[int] = None
     alvo_tipo: Optional[str] = None
     alvo_id: Optional[int] = None
     detalhes: Optional[str] = None

@@ -21,6 +21,7 @@ def registrar(
     if detalhes is not None and not isinstance(detalhes, str):
         detalhes = json.dumps(detalhes, ensure_ascii=False, default=str)
     s.add(RegistroAuditoria(
+        organizacao_id=ator.organizacao_id,
         usuario_id=ator.id,
         usuario_nome=ator.username or ator.nome,
         acao=acao,
@@ -31,10 +32,13 @@ def registrar(
     ))
 
 
-def listar(s: Session, projeto_id: Optional[int] = None, limite: int = 200):
+def listar(s: Session, projeto_id: Optional[int] = None, limite: int = 200,
+           organizacao_id: Optional[int] = None):
     consulta = select(RegistroAuditoria)
     if projeto_id is not None:
         consulta = consulta.where(RegistroAuditoria.projeto_id == projeto_id)
+    if organizacao_id is not None:
+        consulta = consulta.where(RegistroAuditoria.organizacao_id == organizacao_id)
     return s.exec(
         consulta.order_by(RegistroAuditoria.momento.desc(), RegistroAuditoria.id.desc()).limit(limite)
     ).all()

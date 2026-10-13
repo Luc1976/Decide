@@ -8,6 +8,8 @@ from sqlmodel import Session
 from api.autenticacao import ler_token
 from nucleo.ator import Ator
 from nucleo.db import nova_sessao
+from nucleo.permissoes import organizacao_ativa
+from nucleo.servicos.usuarios import MENSAGEM_ORG_DESATIVADA
 from nucleo.tabelas import Usuario
 
 _bearer = HTTPBearer(auto_error=False, description="Token obtido em POST /api/v1/auth/login")
@@ -35,6 +37,8 @@ def ator_atual(s: Sessao, credenciais: Annotated[HTTPAuthorizationCredentials | 
     usuario = s.get(Usuario, usuario_id)
     if usuario is None:
         raise _nao_autenticado("Usuário não encontrado.")
+    if not organizacao_ativa(s, usuario.organizacao_id):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, MENSAGEM_ORG_DESATIVADA)
     return Ator.de_usuario(usuario)
 
 

@@ -10,8 +10,10 @@ class Ator:
     id: Optional[int]
     nome: str                 # gravado nos campos 'autor' (texto) dos registros
     username: str = ""
-    admin: bool = False
+    admin: bool = False       # administrador da organização dele
     pode_criar_projetos: bool = False
+    organizacao_id: Optional[int] = None
+    superadmin: bool = False  # dono da plataforma (gerencia organizações, não os dados delas)
 
     @classmethod
     def de_usuario(cls, usuario: Usuario, nome: Optional[str] = None) -> "Ator":
@@ -21,6 +23,8 @@ class Ator:
             username=usuario.username,
             admin=bool(usuario.admin),
             pode_criar_projetos=bool(usuario.admin or usuario.pode_criar_projetos),
+            organizacao_id=usuario.organizacao_id,
+            superadmin=bool(usuario.superadmin),
         )
 
 

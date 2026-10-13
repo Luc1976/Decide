@@ -29,9 +29,9 @@ def texto_dos_filtros(de: Optional[datetime.date], ate: Optional[datetime.date],
     return " | ".join(partes) or "Todas as decisões"
 
 
-def _logos(projeto_id: int):
+def _logos(projeto: Projeto):
     from logos import logo_empresa, logo_projeto
-    return logo_empresa(), logo_projeto(projeto_id)
+    return logo_empresa(projeto.organizacao_id), logo_projeto(projeto.id)
 
 
 def relatorio_decisoes(
@@ -51,7 +51,7 @@ def relatorio_decisoes(
     projeto = s.get(Projeto, projeto_id)
     atas_por_id = {r.id: (r.numero, r.titulo) for r in servico_atas.consultar(s, projeto_id)}
     nome = nome_do_arquivo(projeto.nome, datetime.datetime.now())
-    logo_empresa, logo_cliente = _logos(projeto_id)
+    logo_empresa, logo_cliente = _logos(projeto)
     with tempfile.TemporaryDirectory() as pasta:
         destino = Path(pasta) / nome
         total = gerar_relatorio_pdf(
@@ -71,7 +71,7 @@ def pdf_ata(s: Session, ator: Ator, projeto_id: int, reuniao_id: int) -> Tuple[s
     ata = det["ata"]
     projeto = s.get(Projeto, ata.projeto_id)
     nome = nome_do_arquivo_ata(ata.numero, ata.titulo, datetime.date.today())
-    logo_empresa, logo_cliente = _logos(ata.projeto_id)
+    logo_empresa, logo_cliente = _logos(projeto)
     with tempfile.TemporaryDirectory() as pasta:
         destino = Path(pasta) / nome
         gerar_ata_pdf(destino, projeto.nome, ata, det["decisoes"], det["alteracoes_ficha"],

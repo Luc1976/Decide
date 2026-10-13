@@ -1,4 +1,5 @@
 import datetime
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -16,6 +17,8 @@ class UsuarioSaida(Saida):
     nome_completo: str
     admin: bool
     pode_criar_projetos: bool
+    organizacao_id: Optional[int] = None
+    superadmin: bool = False
 
 
 class TokenSaida(BaseModel):

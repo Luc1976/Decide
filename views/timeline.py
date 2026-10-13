@@ -490,7 +490,7 @@ def build_timeline_view(
                 bool(rel_incluir_detalhes.value),
                 NOME_APP,
                 None,
-                logo_empresa(),
+                logo_empresa(projeto.organizacao_id),
                 logo_projeto(projeto.id),
             )
         except Exception as erro:
@@ -629,7 +629,7 @@ def build_timeline_view(
                 size=12,
                 color=ft.Colors.GREY_400,
             )
-            for u in listar_usuarios()
+            for u in listar_usuarios(usuario.id)
         ]
 
     def abrir_usuarios(_):
@@ -647,8 +647,9 @@ def build_timeline_view(
                 input_user_nome.value,
                 bool(input_user_admin.value),
                 bool(input_user_pode_criar.value),
+                criador_id=usuario.id,  # o usuário novo entra na organização do administrador
             )
-        except ValueError as erro:
+        except (ValueError, PermissionError) as erro:
             mensagem_usuario.color = ft.Colors.RED_400
             mensagem_usuario.value = str(erro)
             page.update()
@@ -796,7 +797,7 @@ def build_timeline_view(
     btn_remover_logo_empresa = ft.TextButton(content="Remover logo", icon=ft.Icons.DELETE_OUTLINE)
 
     def desenhar_logo_empresa():
-        atual = logo_empresa()
+        atual = logo_empresa(usuario.organizacao_id)
         area_logo_empresa.content = _miniatura_logo(atual)
         btn_remover_logo_empresa.visible = atual is not None
 

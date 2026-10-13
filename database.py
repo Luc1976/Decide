@@ -12,10 +12,10 @@ import os
 import secrets
 from typing import List, Optional
 
-from sqlmodel import Session, SQLModel, select
+from sqlmodel import Session, select
 
 from nucleo.ator import Ator
-from nucleo.db import engine, eh_sqlite, nova_sessao
+from nucleo.db import engine, nova_sessao
 from nucleo.marcacoes import extrair_decisoes, extrair_pendencias  # noqa: F401  (reexportadas)
 from nucleo.marcacoes import normalizar as _normalizar  # noqa: F401
 from nucleo.permissoes import nivel as _nivel_sessao
@@ -37,6 +37,7 @@ from nucleo.tabelas import (  # noqa: F401  (reexportadas para as telas e script
     CaracteristicaHistorico,
     Decisao,
     MembroProjeto,
+    Organizacao,
     PadraoConstrutivo,
     Pendencia,
     Projeto,
@@ -56,44 +57,8 @@ def _ator(s: Session, usuario_id: Optional[int], autor: Optional[str] = None) ->
 
 # ---------------------------------------------------------------- banco: criação e migração
 
-def _migrar_banco():
-    """create_all não altera tabelas já existentes: adiciona as colunas novas em bancos
-    SQLite antigos e numera as decisões antigas. (No PostgreSQL o banco nasce completo;
-    mudanças futuras de esquema devem ir para migrações Alembic.)"""
-    if eh_sqlite(engine):
-        with engine.begin() as conn:
-            def colunas(tabela):
-                return {c[1] for c in conn.exec_driver_sql(f"PRAGMA table_info({tabela})").fetchall()}
-
-            atuais = colunas("decisao")
-            if "reuniao_id" not in atuais:
-                conn.exec_driver_sql("ALTER TABLE decisao ADD COLUMN reuniao_id INTEGER REFERENCES reuniao(id)")
-            if "numero" not in atuais:
-                conn.exec_driver_sql("ALTER TABLE decisao ADD COLUMN numero INTEGER")
-
-            atuais = colunas("caracteristicahistorico")
-            if "decisao_id" not in atuais:
-                conn.exec_driver_sql(
-                    "ALTER TABLE caracteristicahistorico ADD COLUMN decisao_id INTEGER REFERENCES decisao(id)")
-            if "reuniao_id" not in atuais:
-                conn.exec_driver_sql(
-                    "ALTER TABLE caracteristicahistorico ADD COLUMN reuniao_id INTEGER REFERENCES reuniao(id)")
-
-            if "pode_criar_projetos" not in colunas("usuario"):
-                conn.exec_driver_sql(
-                    "ALTER TABLE usuario ADD COLUMN pode_criar_projetos BOOLEAN NOT NULL DEFAULT 1")
-                # Banco de antes das permissões: todos viam todos os projetos. Para ninguém
-                # perder acesso, cada usuário comum vira Editor dos projetos que já existem
-                # (administradores já enxergam tudo). Roda uma única vez.
-                conn.exec_driver_sql(
-                    "INSERT INTO membroprojeto (projeto_id, usuario_id, papel) "
-                    "SELECT p.id, u.id, 'Editor' FROM projeto p CROSS JOIN usuario u WHERE u.admin = 0")
-
-            atuais = colunas("padraoconstrutivo")
-            for nome in ("shop_estrutura", "shop_cobertura"):
-                if atuais and nome not in atuais:
-                    conn.exec_driver_sql(f"ALTER TABLE padraoconstrutivo ADD COLUMN {nome} TEXT")
-
+def _numerar_decisoes_antigas() -> None:
+    """Decisões de antes da numeração D-xxx recebem número (só age se houver alguma)."""
     with Session(engine) as session:
         from nucleo.numeracao import proxima_decisao
 
@@ -111,19 +76,27 @@ def _migrar_banco():
         session.commit()
 
 
-def _criar_admin_inicial(session: Session) -> None:
-    """Só cria o administrador quando NÃO há nenhum usuário (banco novo).
-    Usuário/senha vêm de MEMORIA_ADMIN_USUARIO / MEMORIA_ADMIN_SENHA. Sem a senha,
-    gera uma aleatória e mostra uma única vez no log. Nunca há senha fixa."""
+def _criar_primeira_organizacao(session: Session) -> None:
+    """Banco novo (nenhum usuário): cria a organização inicial e o administrador dela,
+    que também é o superadmin (dono da plataforma). Nunca há senha fixa:
+    MEMORIA_ADMIN_USUARIO / MEMORIA_ADMIN_SENHA, ou uma senha aleatória mostrada no log."""
     if session.exec(select(Usuario)).first():
         return
+    from nucleo.servicos.organizacoes import nova_organizacao
+
+    org = session.exec(select(Organizacao)).first() or nova_organizacao(
+        session, (os.getenv("DECIDIU_ORG_INICIAL") or "Organização principal").strip() or "Organização principal"
+    )
     username = (os.getenv("MEMORIA_ADMIN_USUARIO") or "lucas").strip().lower()
     nome = (os.getenv("MEMORIA_ADMIN_NOME") or "Administrador").strip()
     senha = os.getenv("MEMORIA_ADMIN_SENHA") or ""
     gerada = len(senha) < 6
     if gerada:
         senha = secrets.token_urlsafe(9)
-    session.add(Usuario(username=username, senha=hash_senha(senha), nome_completo=nome, admin=True))
+    session.add(Usuario(username=username, senha=hash_senha(senha), nome_completo=nome, admin=True,
+                        organizacao_id=org.id, superadmin=True))
+    if not session.exec(select(Projeto)).first():  # projeto de exemplo
+        session.add(Projeto(nome="Sede Corporativa Ru.A", cliente="Cliente Modelo", organizacao_id=org.id))
     if gerada:
         print(
             f"[memoria] Usuário inicial criado: '{username}' com senha temporária '{senha}'. "
@@ -133,13 +106,19 @@ def _criar_admin_inicial(session: Session) -> None:
 
 
 def init_db():
-    SQLModel.metadata.create_all(engine)
-    _migrar_banco()
+    """Leva o banco à versão mais nova (Alembic) e prepara o primeiro acesso."""
+    from nucleo.migracoes import atualizar_banco
+
+    atualizar_banco(engine)
+    _numerar_decisoes_antigas()
     with Session(engine) as session:
-        _criar_admin_inicial(session)
-        if not session.exec(select(Projeto)).first():  # projeto de exemplo num banco novo
-            session.add(Projeto(nome="Sede Corporativa Ru.A", cliente="Cliente Modelo"))
+        _criar_primeira_organizacao(session)
         session.commit()
+        primeira = session.exec(select(Organizacao).order_by(Organizacao.id)).first()
+    if primeira is not None:
+        from logos import migrar_logo_legado
+
+        migrar_logo_legado(primeira.id)  # logo único de antes vai para a 1ª organização
 
 
 # ---------------------------------------------------------------- usuários
@@ -182,19 +161,40 @@ def aplicar_reset_de_senha_do_ambiente() -> None:
 
 
 def autenticar_usuario(username: str, senha: str) -> Optional[Usuario]:
+    """None se a senha não confere OU se a organização do usuário está desativada."""
     with nova_sessao() as s:
-        return s_usuarios.autenticar(s, username, senha)
+        try:
+            return s_usuarios.autenticar(s, username, senha)
+        except PermissionError:
+            return None
 
 
 def criar_usuario(username: str, senha: str, nome_completo: str, admin: bool = False,
-                  pode_criar_projetos: bool = True) -> Usuario:
+                  pode_criar_projetos: bool = True, criador_id: Optional[int] = None,
+                  organizacao_slug: Optional[str] = None) -> Usuario:
+    """Pelas telas, informe 'criador_id' (o administrador): o usuário entra na organização dele.
+    Pela linha de comando: 'organizacao_slug', ou a única organização existente."""
     with nova_sessao() as s:
-        return s_usuarios.criar(s, username, senha, nome_completo, admin, pode_criar_projetos)
+        ator = _ator(s, criador_id) if criador_id is not None else None
+        org_id = None
+        if organizacao_slug:
+            org = s.exec(select(Organizacao).where(Organizacao.slug == organizacao_slug.strip())).first()
+            if org is None:
+                raise ValueError(f"Organização '{organizacao_slug}' não encontrada.")
+            org_id = org.id
+        return s_usuarios.criar(s, username, senha, nome_completo, admin, pode_criar_projetos,
+                                ator=ator, organizacao_id=org_id)
 
 
-def listar_usuarios() -> List[Usuario]:
+def listar_organizacoes() -> List[Organizacao]:
     with nova_sessao() as s:
-        return s_usuarios.listar(s)
+        return list(s.exec(select(Organizacao).order_by(Organizacao.nome)).all())
+
+
+def listar_usuarios(solicitante_id: Optional[int] = None) -> List[Usuario]:
+    """Com 'solicitante_id' (administrador): só os usuários da organização dele."""
+    with nova_sessao() as s:
+        return s_usuarios.listar(s, _ator(s, solicitante_id) if solicitante_id is not None else None)
 
 
 def alterar_propria_senha(usuario_id: int, senha_atual: str, nova_senha: str) -> None:

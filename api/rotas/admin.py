@@ -4,6 +4,7 @@ from fastapi import APIRouter, File, UploadFile
 
 from api.deps import AtorAtual, Sessao
 from api.esquemas.auth import NovoUsuarioEntrada, UsuarioSaida
+from api.esquemas.projetos import AuditoriaSaida
 from nucleo import auditoria
 from nucleo.permissoes import exigir_admin
 from nucleo.servicos import usuarios
@@ -30,3 +31,9 @@ def logo_empresa(ator: AtorAtual, s: Sessao, arquivo: UploadFile = File(...)):
     salvar_logo_empresa(arquivo.file.read(TAMANHO_MAXIMO + 1), ator)
     auditoria.registrar(s, ator, "logo.empresa")
     s.commit()
+
+
+@rotas.get("/auditoria", response_model=List[AuditoriaSaida], summary="Auditoria da organização inteira")
+def auditoria_da_organizacao(ator: AtorAtual, s: Sessao, limite: int = 200):
+    usuario = exigir_admin(s, ator)
+    return auditoria.listar(s, limite=min(max(limite, 1), 1000), organizacao_id=usuario.organizacao_id)

@@ -5,29 +5,30 @@
 Roda separada do app Flet (main.py) e usa o mesmo banco e as mesmas regras (nucleo/).
 Por não guardar estado em memória entre requisições, pode rodar em várias instâncias.
 """
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
-from sqlmodel import SQLModel
 
 from api import erros
 from api.configuracao import PREFIXO, VERSAO, configuracao
 from api.deps import Sessao
-from api.rotas import admin, arquivos, atas, auth, decisoes, ficha, pendencias, projetos
+from api.rotas import admin, arquivos, atas, auth, decisoes, ficha, organizacoes, pendencias, projetos
 from config import garantir_pastas
 from models import CAMPOS_LONGOS, CATEGORIAS, FICHA_GRUPOS, IMPACTOS, PAPEIS
-from nucleo.db import engine
+from nucleo.migracoes import atualizar_banco
 from nucleo.tabelas import SITUACOES_PENDENCIA, TipologiaProjeto
 
 
 @asynccontextmanager
 async def _ciclo_de_vida(_: FastAPI):
     garantir_pastas()
-    # Cria só as tabelas que faltam (ex.: auditoria). Mudanças em tabelas existentes
-    # devem ir para migrações Alembic, não para cá.
-    SQLModel.metadata.create_all(engine)
+    if os.getenv("DECIDIU_MIGRAR_NA_PARTIDA", "1") == "1":
+        # "alembic upgrade head": só aplica o que falta. No PostgreSQL há uma trava, então o
+        # app Flet e a API podem iniciar juntos sem conflito.
+        atualizar_banco()
     yield
 
 
@@ -59,8 +60,9 @@ def criar_app() -> FastAPI:
         return resposta
 
     erros.registrar(app)
-    for modulo in (auth, projetos, decisoes, atas, pendencias, ficha, admin, arquivos):
+    for modulo in (auth, organizacoes, projetos, decisoes, atas, pendencias, ficha, admin, arquivos):
         app.include_router(modulo.rotas, prefix=PREFIXO)
+    app.include_router(organizacoes.plataforma, prefix=PREFIXO)
 
     @app.get("/api/saude", tags=["Sistema"], summary="Verificação de funcionamento (para o Railway)")
     def saude(s: Sessao):

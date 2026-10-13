@@ -1,6 +1,6 @@
 """Logotipos que aparecem no cabeçalho dos PDFs (relatório de decisões e atas).
 
-- Logo da empresa (do escritório): um só para o sistema, só administradores trocam.
+- Logo da empresa (do escritório): um por organização, só o administrador dela troca.
 - Logo do cliente: um por projeto, trocado pelo Responsável do projeto.
 
 As imagens ficam em DATA_DIR/logos, fora da pasta pública. Toda imagem enviada é aberta
@@ -18,8 +18,22 @@ LADO_MAXIMO = 1200  # px; o cabeçalho do PDF tem ~1,5 cm de altura, isso sobra
 EXTENSOES = ["png", "jpg", "jpeg", "webp", "gif", "bmp"]
 
 
-def caminho_logo_empresa() -> Path:
-    return LOGOS_DIR / "empresa.png"
+LOGO_EMPRESA_LEGADO = "empresa.png"  # de antes das organizações (um só para o sistema)
+
+
+def caminho_logo_empresa(organizacao_id: Optional[int]) -> Optional[Path]:
+    if organizacao_id is None:
+        return None
+    return LOGOS_DIR / f"empresa-org{int(organizacao_id)}.png"
+
+
+def migrar_logo_legado(organizacao_id: int) -> bool:
+    """Passa o logo antigo (único) para a organização informada. Roda uma vez, na partida."""
+    antigo, novo = LOGOS_DIR / LOGO_EMPRESA_LEGADO, caminho_logo_empresa(organizacao_id)
+    if antigo.is_file() and not novo.exists():
+        antigo.replace(novo)
+        return True
+    return False
 
 
 def caminho_logo_projeto(projeto_id: int) -> Path:
@@ -30,9 +44,10 @@ def _existente(caminho: Path) -> Optional[Path]:
     return caminho if caminho.is_file() else None
 
 
-def logo_empresa() -> Optional[Path]:
-    """Caminho do logo da empresa, ou None se não houver."""
-    return _existente(caminho_logo_empresa())
+def logo_empresa(organizacao_id: Optional[int] = None) -> Optional[Path]:
+    """Caminho do logo da empresa (da organização), ou None se não houver."""
+    caminho = caminho_logo_empresa(organizacao_id)
+    return _existente(caminho) if caminho else None
 
 
 def logo_projeto(projeto_id: int) -> Optional[Path]:
@@ -76,9 +91,9 @@ def _gravar(destino: Path, dados: bytes) -> Path:
 
 
 def salvar_logo_empresa(dados: bytes, usuario) -> Path:
-    if not getattr(usuario, "admin", False):
+    if not getattr(usuario, "admin", False) or getattr(usuario, "organizacao_id", None) is None:
         raise PermissionError("Só administradores podem trocar o logo da empresa.")
-    return _gravar(caminho_logo_empresa(), dados)
+    return _gravar(caminho_logo_empresa(usuario.organizacao_id), dados)
 
 
 def salvar_logo_projeto(projeto_id: int, dados: bytes, usuario) -> Path:
@@ -87,9 +102,9 @@ def salvar_logo_projeto(projeto_id: int, dados: bytes, usuario) -> Path:
 
 
 def remover_logo_empresa(usuario) -> None:
-    if not getattr(usuario, "admin", False):
+    if not getattr(usuario, "admin", False) or getattr(usuario, "organizacao_id", None) is None:
         raise PermissionError("Só administradores podem remover o logo da empresa.")
-    caminho_logo_empresa().unlink(missing_ok=True)
+    caminho_logo_empresa(usuario.organizacao_id).unlink(missing_ok=True)
 
 
 def remover_logo_projeto(projeto_id: int, usuario=None) -> None:

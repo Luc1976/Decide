@@ -6,6 +6,22 @@ dependências e roda o app, mas **não guarda dados**. As informações ficam em
 **volume persistente do servidor**: o banco `memoria_projetos.db` (SQLite) e os anexos.
 Tudo fica na pasta definida por `MEMORIA_DATA_DIR` (no Docker: `/dados`).
 
+## Atualização com organizações e Alembic (fazer uma vez)
+Esta versão muda a estrutura do banco na primeira partida (migrações do Alembic):
+cria a tabela de organizações e coloca todos os usuários e projetos atuais numa organização só.
+Ninguém perde acesso, mas faça assim:
+
+1. **Backup antes**: copie o `memoria_projetos.db` (e a pasta `/dados` inteira) do volume.
+2. No Railway, defina `DECIDIU_ORG_INICIAL` com o nome do escritório (ex.: `Ru.A Estúdio`).
+   Sem ela, o nome fica "Organização principal" (dá para trocar depois pela API).
+3. Rode `uv lock` no PC e publique (entraram `alembic`, `pyjwt` e `psycopg`).
+4. No log da partida deve aparecer `[memoria] Banco atualizado: versão sem versão -> 0002`.
+   Nas partidas seguintes essa linha não aparece (não há nada a aplicar). Para conferir:
+   `alembic current` no terminal do serviço (deve mostrar `0002 (head)`).
+
+O administrador mais antigo (o usuário inicial) vira também **superadmin**: pode criar outras
+organizações (escritórios clientes do Decidiu) pela API, em `/api/docs`.
+
 ## Como funciona
 - O Python roda no servidor e o navegador é só a tela (Flet em modo web). Todos
   os usuários compartilham o mesmo banco.

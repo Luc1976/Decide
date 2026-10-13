@@ -23,13 +23,19 @@ from sqlmodel import SQLModel  # noqa: E402
 import database  # noqa: E402
 
 
+def zerar_banco():
+    SQLModel.metadata.drop_all(database.engine)
+    with database.engine.begin() as conexao:
+        conexao.exec_driver_sql("DROP TABLE IF EXISTS alembic_version")
+
+
 @pytest.fixture(autouse=True)
 def banco_limpo():
-    """Banco zerado a cada teste (mesmo arquivo, tabelas recriadas)."""
-    SQLModel.metadata.drop_all(database.engine)
+    """Banco zerado a cada teste, recriado pelas migrações (como num banco novo de verdade)."""
+    zerar_banco()
     database.init_db()
     yield
-    SQLModel.metadata.drop_all(database.engine)
+    zerar_banco()
 
 
 @pytest.fixture
