@@ -18,6 +18,7 @@ from api.deps import Sessao
 from api.rotas import admin, arquivos, atas, auth, decisoes, ficha, organizacoes, pendencias, projetos
 from config import garantir_pastas
 from models import CAMPOS_LONGOS, CATEGORIAS, FICHA_GRUPOS, IMPACTOS, PAPEIS
+from nucleo.db import aguardar_banco
 from nucleo.migracoes import atualizar_banco
 from nucleo.tabelas import SITUACOES_PENDENCIA, TipologiaProjeto
 
@@ -25,6 +26,7 @@ from nucleo.tabelas import SITUACOES_PENDENCIA, TipologiaProjeto
 @asynccontextmanager
 async def _ciclo_de_vida(_: FastAPI):
     garantir_pastas()
+    aguardar_banco()  # se o banco não responder, a mensagem no log explica a causa provável
     if os.getenv("DECIDIU_MIGRAR_NA_PARTIDA", "1") == "1":
         # "alembic upgrade head": só aplica o que falta. No PostgreSQL há uma trava, então o
         # app Flet e a API podem iniciar juntos sem conflito.

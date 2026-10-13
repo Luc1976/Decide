@@ -107,8 +107,10 @@ def _criar_primeira_organizacao(session: Session) -> None:
 
 def init_db():
     """Leva o banco à versão mais nova (Alembic) e prepara o primeiro acesso."""
+    from nucleo.db import aguardar_banco
     from nucleo.migracoes import atualizar_banco
 
+    aguardar_banco(engine)  # espera o banco subir; se não der, explica a causa provável
     atualizar_banco(engine)
     _numerar_decisoes_antigas()
     with Session(engine) as session:

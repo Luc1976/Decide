@@ -16,7 +16,14 @@ from database import (  # noqa: E402  (depois de checar a pasta)
     usuarios_com_senha_padrao,
 )
 
-init_db()  # cria o banco e o administrador inicial uma única vez, na partida do servidor
+from nucleo.db import ErroConexaoBanco, endereco_seguro  # noqa: E402
+
+print(f"[memoria] Banco: {endereco_seguro()}", flush=True)
+try:
+    init_db()  # migrações + administrador inicial (só num banco novo), na partida do servidor
+except ErroConexaoBanco as erro:
+    print(f"[memoria] ERRO: {erro}", flush=True)
+    raise SystemExit(1)
 aplicar_reset_de_senha_do_ambiente()  # só age se MEMORIA_RESETAR_SENHA estiver definida
 
 _inseguros = usuarios_com_senha_padrao()

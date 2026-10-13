@@ -6,6 +6,25 @@ dependências e roda o app, mas **não guarda dados**. As informações ficam em
 **volume persistente do servidor**: o banco `memoria_projetos.db` (SQLite) e os anexos.
 Tudo fica na pasta definida por `MEMORIA_DATA_DIR` (no Docker: `/dados`).
 
+## Usar o PostgreSQL do Railway (banco novo)
+1. O PostgreSQL e o serviço do app precisam estar no **mesmo projeto e no mesmo ambiente** do
+   Railway (o endereço `postgres.railway.internal` só funciona lá dentro).
+2. No serviço do PostgreSQL: confira que está **Active** e deixe o *App Sleeping* desligado.
+3. No serviço do app, crie as variáveis **antes** de publicar (o primeiro usuário só é criado
+   num banco vazio, na primeira partida):
+   - `DECIDIU_DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (referência, não cole o endereço;
+     troque `Postgres` pelo nome do serviço do banco);
+   - `MEMORIA_ADMIN_USUARIO` = `lucas` e `MEMORIA_ADMIN_SENHA` = a senha que você quer (6+ caracteres).
+     Sem a senha, uma senha aleatória aparece **uma vez** no log;
+   - `DECIDIU_ORG_INICIAL` = nome do escritório (ex.: `Ru.A Estúdio`).
+4. No log da partida deve aparecer:
+   `[memoria] Banco: postgresql+psycopg://...:***@postgres.railway.internal:5432/...` e depois
+   `[memoria] Banco atualizado: versão sem versão -> 0002`.
+5. Se o banco não responder, o app tenta por ~90 s e então escreve no log as causas prováveis.
+   Para voltar ao SQLite, apague `DECIDIU_DATABASE_URL`.
+
+O volume `/dados` continua necessário: anexos, logos e PDFs ainda ficam nele.
+
 ## Atualização com organizações e Alembic (fazer uma vez)
 Esta versão muda a estrutura do banco na primeira partida (migrações do Alembic):
 cria a tabela de organizações e coloca todos os usuários e projetos atuais numa organização só.
