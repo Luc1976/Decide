@@ -105,7 +105,17 @@ CORES_SITUACAO = {
     "Ativa": "#81C784",
     "Suspensa": "#EF9A9A",
 }
+CORES_DOCUMENTO = {"Recebido": "#81C784", "Pendente": "#FFD54F", "N/A": "#BDBDBD"}
 _NEUTRO = ("#BDBDBD", "#616161")
+
+
+def cor_documento_forte(page, situacao: str) -> str:
+    """Ícone da situação do documento: verde (recebido), âmbar (pendente), neutro (N/A)."""
+    if situacao == "Recebido":
+        return sucesso(page)
+    if situacao == "Pendente":
+        return aviso(page)
+    return ft.Colors.ON_SURFACE_VARIANT
 
 
 def cor_categoria(categoria: str) -> str:

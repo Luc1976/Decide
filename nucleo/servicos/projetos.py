@@ -13,6 +13,7 @@ from nucleo.tabelas import (
     Caracteristica,
     CaracteristicaHistorico,
     Decisao,
+    DocumentoReferencia,
     MembroProjeto,
     PadraoConstrutivo,
     Pendencia,
@@ -67,6 +68,9 @@ def criar(s: Session, ator: Ator, nome: str, cliente: str, descricao: Optional[s
     s.flush()  # gera o id
     if not criador.admin:
         s.add(MembroProjeto(projeto_id=projeto.id, usuario_id=criador.id, papel=RESPONSAVEL))
+    from nucleo.servicos.documentos import criar_lista_padrao
+
+    criar_lista_padrao(s, projeto.id)  # checklist de documentos de referência
     auditoria.registrar(s, ator, "projeto.criar", projeto.id, "projeto", projeto.id, {"nome": nome})
     s.commit()
     s.refresh(projeto)
@@ -94,7 +98,8 @@ def resumo(s: Session, ator: Ator, projeto_id: int) -> dict:
     atas = s.exec(select(Reuniao.id).where(Reuniao.projeto_id == projeto_id)).all()
     membros = s.exec(select(MembroProjeto.id).where(MembroProjeto.projeto_id == projeto_id)).all()
     pendencias = s.exec(select(Pendencia.id).where(Pendencia.projeto_id == projeto_id)).all()
-    anexos = sum(len([c for c in (d.anexos or "").split(",") if c]) for d in decisoes)
+    documentos = s.exec(select(DocumentoReferencia).where(DocumentoReferencia.projeto_id == projeto_id)).all()
+    anexos = sum(len([c for c in (d.anexos or "").split(",") if c]) for d in [*decisoes, *documentos])
     return {"decisoes": len(decisoes), "atas": len(atas), "anexos": anexos,
             "membros": len(membros), "pendencias": len(pendencias)}
 
@@ -107,10 +112,12 @@ def excluir(s: Session, ator: Ator, projeto_id: int) -> List[str]:
     decisoes = s.exec(select(Decisao).where(Decisao.projeto_id == projeto_id)).all()
     reunioes = s.exec(select(Reuniao).where(Reuniao.projeto_id == projeto_id)).all()
     caminhos = [c for d in decisoes for c in (d.anexos or "").split(",") if c]
+    documentos = s.exec(select(DocumentoReferencia).where(DocumentoReferencia.projeto_id == projeto_id)).all()
+    caminhos += [c for d in documentos for c in (d.anexos or "").split(",") if c]
 
     # A ordem importa por causa das chaves estrangeiras: primeiro quem aponta para
     # decisões/atas, depois as decisões, depois as atas e por fim o próprio projeto.
-    for tabela in (CaracteristicaHistorico, Caracteristica, PadraoConstrutivo, Pendencia):
+    for tabela in (CaracteristicaHistorico, Caracteristica, PadraoConstrutivo, Pendencia, DocumentoReferencia):
         for item in s.exec(select(tabela).where(tabela.projeto_id == projeto_id)).all():
             s.delete(item)
     s.flush()

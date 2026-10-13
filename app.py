@@ -7,6 +7,7 @@ import tema
 
 from database import autenticar_usuario, definir_tema, init_db, listar_projetos_do_usuario, pode_no_projeto
 from views.atas import build_atas_view
+from views.documentos import build_documentos_view
 from views.ficha import build_ficha_view
 from views.login import build_login_view
 from views.pendencias import build_pendencias_view
@@ -89,8 +90,12 @@ def main(page: ft.Page):
                 usuario_logado,
                 sair,
                 voltar_timeline,
+                abrir_documentos,
             )
         )
+
+    def montar_documentos():
+        mostrar_view(build_documentos_view(page, projeto_ativo, usuario_logado, sair, abrir_ficha))
 
     def montar_atas():
         nonlocal ata_para_abrir
@@ -159,6 +164,9 @@ def main(page: ft.Page):
     async def abrir_pendencias(_=None):
         await page.push_route("/pendencias")
 
+    async def abrir_documentos(_=None):
+        await page.push_route("/documentos")
+
     async def abrir_plataforma(_=None):
         await page.push_route("/plataforma")
 
@@ -207,6 +215,8 @@ def main(page: ft.Page):
             montar_ficha()
         elif page.route == "/pendencias":
             montar_pendencias()
+        elif page.route == "/documentos":
+            montar_documentos()
         else:
             asyncio.create_task(page.push_route("/timeline"))
 

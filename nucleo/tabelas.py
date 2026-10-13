@@ -211,6 +211,29 @@ class Pendencia(SQLModel, table=True):
     data_resolucao: Optional[datetime.datetime] = None
 
 
+# ---------------------------------------------------------------- documentos de referência
+
+DOC_PENDENTE, DOC_RECEBIDO, DOC_NA = "Pendente", "Recebido", "N/A"
+SITUACOES_DOCUMENTO = (DOC_RECEBIDO, DOC_PENDENTE, DOC_NA)
+
+
+class DocumentoReferencia(SQLModel, table=True):
+    """Item do checklist de arquivos e informações recebidas do cliente (topografia,
+    sondagens, BEP...). Os itens padrão nascem com o projeto; a equipe acrescenta outros."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    projeto_id: int = Field(foreign_key="projeto.id", index=True)
+    nome: str
+    situacao: str = DOC_PENDENTE          # "Recebido", "Pendente" ou "N/A" (não aplicável)
+    padrao: bool = Field(default=False)   # veio da lista padrão (não pode ser excluído)
+    ordem: int = 0
+    observacao: str = ""                  # ex.: "recebido por e-mail, revisão R02"
+    anexos: Optional[str] = None          # chaves dos arquivos, separadas por vírgula
+    data_recebimento: Optional[datetime.date] = None
+    recebido_por: str = ""
+    atualizado_por: str = ""
+    data_atualizacao: datetime.datetime = Field(default_factory=_agora)
+
+
 # ---------------------------------------------------------------- auditoria (tabela nova)
 
 class RegistroAuditoria(SQLModel, table=True):

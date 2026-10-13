@@ -4,6 +4,7 @@ import flet as ft
 
 import tema
 from database import (
+    resumo_documentos,
     listar_caracteristicas,
     nivel_no_projeto,
     listar_historico_ficha,
@@ -12,7 +13,7 @@ from database import (
 )
 from ficha_calculos import calcular_indicadores
 from models import CAMPOS_LONGOS, FICHA_GRUPOS, GRUPO_OUTRAS, NIVEL_PAPEL
-from layout import col, largura_dialogo, opcoes_dialogo
+from layout import rotulo, col, largura_dialogo, opcoes_dialogo
 from views.questionario_sistemas import criar_aba_sistemas_construtivos
 
 
@@ -23,13 +24,21 @@ def _hora_local(momento: datetime.datetime) -> datetime.datetime:
     return momento.astimezone()
 
 
-def build_ficha_view(page, projeto, usuario, on_logout, on_voltar):
+def build_ficha_view(page, projeto, usuario, on_logout, on_voltar, on_open_documentos=None):
     """Ficha de características do empreendimento: os inputs iniciais do projeto."""
 
     # Leitor (cliente) vê a ficha, mas não altera.
     pode_editar = projeto is not None and (
         nivel_no_projeto(usuario.id, projeto.id) >= NIVEL_PAPEL["Editor"]
     )
+
+    def _contagem_documentos() -> str:
+        """' (3/7)': recebidos / aplicáveis, para o botão de acesso."""
+        try:
+            contagem = resumo_documentos(projeto.id, usuario.id)
+        except (ValueError, PermissionError):
+            return ""
+        return f" ({contagem['Recebido']}/{contagem['aplicaveis']})" if contagem["total"] else ""
 
     salvos = {}
     if projeto is not None:
@@ -302,6 +311,16 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar):
                     alignment=ft.MainAxisAlignment.END,
                     controls=[
                         tema.botao_secundario("Linha do tempo", ft.Icons.TIMELINE, on_voltar),
+                        *(
+                            [tema.botao_destaque(
+                                rotulo(page, "Documentos de referência", "Documentos") + _contagem_documentos(),
+                                ft.Icons.FOLDER_COPY_OUTLINED,
+                                on_open_documentos,
+                                terciario=True,
+                            )]
+                            if on_open_documentos and projeto is not None
+                            else []
+                        ),
                         ft.Button(
                             content="Histórico",
                             icon=ft.Icons.HISTORY,

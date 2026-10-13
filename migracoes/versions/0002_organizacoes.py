@@ -74,7 +74,7 @@ def _distribuir_dados_existentes() -> None:
     projeto = sa.table("projeto", sa.column("id"), sa.column("organizacao_id"))
     auditoria = sa.table("registroauditoria", sa.column("organizacao_id"))
     organizacao = sa.table("organizacao", sa.column("id"), sa.column("nome"), sa.column("slug"),
-                           sa.column("ativa"), sa.column("data_criacao"))
+                           sa.column("ativa"), sa.column("data_criacao", sa.DateTime()))
 
     tem_usuarios = conexao.execute(sa.select(sa.func.count()).select_from(usuario)).scalar()
     tem_projetos = conexao.execute(sa.select(sa.func.count()).select_from(projeto)).scalar()

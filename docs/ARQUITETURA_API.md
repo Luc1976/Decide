@@ -33,7 +33,7 @@ O app Flet continua funcionando como antes. Por baixo dele foram criadas duas ca
   e auditoria ficam dentro dela, e nada atravessa essa fronteira (seção 4).
 - **`migracoes/`**: o Alembic controla o esquema do banco, no SQLite e no PostgreSQL
   (seção 6).
-- **`tests/`**: 84 testes automáticos (ver seção 9).
+- **`tests/`**: 103 testes automáticos (ver seção 9).
 
 ## 2. Diagnóstico do código atual
 
@@ -224,6 +224,7 @@ O esquema do banco agora é controlado pelo Alembic. Cada mudança no modelo vir
 | `0001` esquema base | Banco novo: cria todas as tabelas. Banco que já existe (o SQLite do Railway): só cria o que falta e acrescenta as colunas antigas que antes eram postas à mão. Não apaga nada |
 | `0002` organizações | Cria `organizacao`, liga usuários, projetos e auditoria a ela. Num banco com dados, coloca todos numa organização só (`DECIDIU_ORG_INICIAL`), e o administrador mais antigo vira superadmin. Ninguém perde acesso |
 | `0003` tema do usuário | Coluna opcional `usuario.tema` ("claro"/"escuro"); vazia = escuro. `PUT /auth/tema` |
+| `0004` documentos de referência | Tabela `documentoreferencia` (checklist por projeto) e lista padrão nos projetos existentes. Rotas em `/projetos/{id}/documentos` |
 
 **Na partida**, o app Flet (`init_db`) e a API rodam `upgrade head`, que só aplica o que falta.
 No PostgreSQL há uma trava (`pg_advisory_xact_lock`), então os dois podem iniciar juntos.

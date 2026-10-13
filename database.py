@@ -22,6 +22,7 @@ from nucleo.permissoes import nivel as _nivel_sessao
 from nucleo.senhas import hash_senha, senha_confere as _senha_confere  # noqa: F401
 from nucleo.servicos import atas as s_atas
 from nucleo.servicos import decisoes as s_decisoes
+from nucleo.servicos import documentos as s_documentos
 from nucleo.servicos import organizacoes as s_organizacoes
 from nucleo.servicos import ficha as s_ficha
 from nucleo.servicos import pendencias as s_pendencias
@@ -97,7 +98,12 @@ def _criar_primeira_organizacao(session: Session) -> None:
     session.add(Usuario(username=username, senha=hash_senha(senha), nome_completo=nome, admin=True,
                         organizacao_id=org.id, superadmin=True))
     if not session.exec(select(Projeto)).first():  # projeto de exemplo
-        session.add(Projeto(nome="Sede Corporativa Ru.A", cliente="Cliente Modelo", organizacao_id=org.id))
+        from nucleo.servicos.documentos import criar_lista_padrao
+
+        exemplo = Projeto(nome="Sede Corporativa Ru.A", cliente="Cliente Modelo", organizacao_id=org.id)
+        session.add(exemplo)
+        session.flush()
+        criar_lista_padrao(session, exemplo.id)
     if gerada:
         print(
             f"[memoria] Usuário inicial criado: '{username}' com senha temporária '{senha}'. "
@@ -427,6 +433,50 @@ def contar_pendencias_abertas(projeto_id: int) -> int:
 def listar_pendencias_reuniao(reuniao_id: int) -> List[Pendencia]:
     with nova_sessao() as s:
         return list(s.exec(select(Pendencia).where(Pendencia.reuniao_id == reuniao_id).order_by(Pendencia.numero)).all())
+
+
+# ---------------------------------------------------------------- documentos de referência
+
+def listar_documentos(projeto_id: int, usuario_id: int) -> list:
+    with nova_sessao() as s:
+        return s_documentos.listar(s, _ator(s, usuario_id), projeto_id)
+
+
+def resumo_documentos(projeto_id: int, usuario_id: int) -> dict:
+    with nova_sessao() as s:
+        return s_documentos.resumo_do_projeto(s, _ator(s, usuario_id), projeto_id)
+
+
+def criar_documento(projeto_id: int, nome: str, observacao: str, usuario_id: int):
+    with nova_sessao() as s:
+        return s_documentos.criar(s, _ator(s, usuario_id), projeto_id, nome, observacao)
+
+
+def atualizar_documento(documento_id: int, usuario_id: int, situacao=None, observacao=None, nome=None):
+    with nova_sessao() as s:
+        return s_documentos.atualizar(s, _ator(s, usuario_id), documento_id,
+                                      situacao=situacao, observacao=observacao, nome=nome)
+
+
+def excluir_documento(documento_id: int, usuario_id: int) -> list:
+    """Devolve as chaves dos arquivos, para apagar do disco depois do commit."""
+    with nova_sessao() as s:
+        return s_documentos.excluir(s, _ator(s, usuario_id), documento_id)
+
+
+def anexar_documento(documento_id: int, chave: str, usuario_id: int):
+    with nova_sessao() as s:
+        return s_documentos.anexar(s, _ator(s, usuario_id), documento_id, chave)
+
+
+def remover_anexo_documento(documento_id: int, indice: int, usuario_id: int) -> str:
+    with nova_sessao() as s:
+        return s_documentos.remover_anexo(s, _ator(s, usuario_id), documento_id, indice)[1]
+
+
+def documento_tem_anexo(projeto_id: int, chave: str) -> bool:
+    with nova_sessao() as s:
+        return s_documentos.documento_tem_anexo(s, projeto_id, chave)
 
 
 # ---------------------------------------------------------------- ficha do empreendimento

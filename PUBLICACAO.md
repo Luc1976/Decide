@@ -49,6 +49,20 @@ Pensada para o celular: a linha do tempo ocupa quase toda a tela.
   plataforma) e conta (modo claro/escuro, senha, sair). Cada item só aparece para quem tem
   permissão, como antes.
 
+## Documentos de referência
+Na **Ficha do Empreendimento**, botão **Documentos de referência (x/y)** (recebidos / aplicáveis).
+Checklist dos arquivos e informações recebidas do cliente. Todo projeto já vem com:
+Levantamento topográfico, Projetos preliminares, Layout, Relatórios de Sondagens SPT,
+Relatório de sondagem a trado (CBR), BEP / EIR e Outros (os projetos que já existiam ganham a
+lista na migração 0004).
+- Situação de cada item: **Recebido**, **Pendente** ou **N/A** (não aplicável). Ao marcar
+  Recebido, o app guarda a data e quem marcou.
+- **Anexar arquivo** guarda o arquivo no item e já o marca como Recebido. Observação livre
+  (ex.: "revisão R02, enviada por e-mail").
+- **+ Novo Item** acrescenta outras informações. Itens acrescentados podem ser renomeados e
+  excluídos; os da lista padrão não (marque N/A quando não se aplicarem).
+- O cliente (Leitor) acompanha a lista e baixa os arquivos, mas não altera.
+
 ## Aparência: modo claro e escuro
 No menu lateral (☰), item "Modo claro" / "Modo escuro". A escolha fica guardada **no usuário**
 (vale em qualquer aparelho) e o padrão continua sendo o modo escuro. A migração 0003 cria essa

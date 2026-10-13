@@ -205,3 +205,33 @@ def test_saude_opcoes_e_openapi(cliente):
     assert "Orçamento" in cliente.get(f"{V}/opcoes").json()["categorias"]
     caminhos = cliente.get("/api/openapi.json").json()["paths"]
     assert f"{V}/projetos/{{projeto_id}}/atas/{{ata_id}}/fechar" in caminhos
+
+
+def test_documentos_de_referencia(cliente, equipe):
+    pid, bia, cli = equipe["pid"], equipe["bia"], equipe["cli"]
+    lista = cliente.get(f"{V}/projetos/{pid}/documentos", headers=cli).json()
+    assert [d["nome"] for d in lista][:2] == ["Levantamento topográfico", "Projetos preliminares"]
+    assert len(lista) == 7 and all(d["situacao"] == "Pendente" for d in lista)
+    layout = next(d for d in lista if d["nome"] == "Layout")
+
+    assert cliente.put(f"{V}/projetos/{pid}/documentos/{layout['id']}", json={"situacao": "Recebido"},
+                       headers=cli).status_code == 403
+    r = cliente.put(f"{V}/projetos/{pid}/documentos/{layout['id']}", json={"situacao": "Recebido"}, headers=bia)
+    assert r.status_code == 200 and r.json()["recebido_por"] == "Bia"
+    assert cliente.put(f"{V}/projetos/{pid}/documentos/{layout['id']}", json={"situacao": "Talvez"},
+                       headers=bia).status_code == 422
+
+    chave = cliente.post(f"{V}/projetos/{pid}/anexos", files={"arquivo": ("bep.pdf", b"%PDF-bep", "application/pdf")},
+                         headers=bia).json()["chave"]
+    bep = next(d for d in lista if d["nome"] == "BEP / EIR")
+    r = cliente.post(f"{V}/projetos/{pid}/documentos/{bep['id']}/anexos", json={"chave": chave}, headers=bia)
+    assert r.json()["situacao"] == "Recebido" and r.json()["anexos"] == [{"indice": 0, "nome": "bep.pdf"}]
+    url = cliente.get(f"{V}/projetos/{pid}/documentos/{bep['id']}/anexos/0/link", headers=cli).json()["url"]
+    assert cliente.get(url).content == b"%PDF-bep"
+
+    novo = cliente.post(f"{V}/projetos/{pid}/documentos", json={"nome": "Licença ambiental"}, headers=bia).json()
+    assert cliente.delete(f"{V}/projetos/{pid}/documentos/{layout['id']}", headers=bia).status_code == 409
+    assert cliente.delete(f"{V}/projetos/{pid}/documentos/{novo['id']}", headers=bia).status_code == 204
+    assert cliente.get(f"{V}/projetos/{pid}/documentos/resumo", headers=cli).json() == {
+        "recebidos": 2, "pendentes": 5, "nao_aplicaveis": 0, "total": 7, "aplicaveis": 7}
+    assert cliente.get(f"{V}/projetos/{pid}/documentos", headers=equipe["ze"]).status_code == 404
