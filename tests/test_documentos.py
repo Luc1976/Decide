@@ -75,22 +75,54 @@ def test_itens_acrescentados(s, cenario):
     assert len(documentos.listar(s, bia, p)) == 7
 
 
-def test_anexos(s, cenario, tmp_path):
+def test_arquivos_com_data_de_recebimento(s, cenario, tmp_path):
     from nucleo.armazenamento import ArmazenamentoLocal
     from nucleo.servicos import anexos
 
     p, bia, ana = cenario["p"], cenario["bia"], cenario["ana"]
-    chave = anexos.enviar(s, bia, p, "sondagem SPT.pdf", b"%PDF", ArmazenamentoLocal(tmp_path))
+    arm = ArmazenamentoLocal(tmp_path)
+    ontem = datetime.date.today() - datetime.timedelta(days=10)
     spt = _doc(s, bia, p, "Relatórios de Sondagens SPT")
-    spt = documentos.anexar(s, bia, spt.id, chave)
-    assert spt.situacao == "Recebido" and documentos.anexos_do_documento(spt) == [chave]
-    assert documentos.anexo(s, cenario["cli"], p, spt.id, 0) == chave
-    assert documentos.documento_tem_anexo(s, p, chave)
+
+    r00 = documentos.anexar(s, bia, spt.id, anexos.enviar(s, bia, p, "SPT R00.pdf", b"%PDF0", arm),
+                            data_recebimento=ontem)
+    assert (r00.nome, r00.data_recebimento, r00.enviado_por) == ("SPT R00.pdf", ontem, "Bia")
+    spt = _doc(s, bia, p, spt.nome)
+    assert (spt.situacao, spt.data_recebimento) == ("Recebido", ontem)  # item recebido na data do arquivo
+
+    r01 = documentos.anexar(s, bia, spt.id, anexos.enviar(s, bia, p, "SPT R01.pdf", b"%PDF1", arm))
+    assert r01.data_recebimento == datetime.date.today()
+    assert _doc(s, bia, p, spt.nome).data_recebimento == ontem  # item mantém a 1ª data
+    [(_, arquivos)] = [(d, a) for d, a in documentos.listar_com_arquivos(s, cenario["cli"], p) if d.id == spt.id]
+    assert [a.nome for a in arquivos] == ["SPT R00.pdf", "SPT R01.pdf"]  # do mais antigo ao mais novo
+
+    with pytest.raises(ValueError, match="futura"):
+        documentos.anexar(s, bia, spt.id, anexos.enviar(s, bia, p, "x.pdf", b"1", arm),
+                          data_recebimento=datetime.date.today() + datetime.timedelta(days=1))
+    corrigida = documentos.definir_data_arquivo(s, bia, r01.id, ontem - datetime.timedelta(days=1))
+    assert corrigida.data_recebimento == ontem - datetime.timedelta(days=1)
+    assert documentos.arquivo(s, cenario["cli"], p, r00.id).chave.startswith(f"uploads/p{p}/")
+    assert documentos.documento_tem_anexo(s, p, r00.chave)
+
     outro = projetos.criar(s, ana, "Outro", "Y")
     with pytest.raises(ValueError, match="inválido"):
-        documentos.anexar(s, ana, _doc(s, ana, outro.id, "Layout").id, chave)
-    _, removida = documentos.remover_anexo(s, bia, spt.id, 0)
-    assert removida == chave and documentos.anexos_do_documento(_doc(s, bia, p, spt.nome)) == []
+        documentos.anexar(s, ana, _doc(s, ana, outro.id, "Layout").id, r00.chave)
+    with pytest.raises(NaoEncontrado):
+        documentos.arquivo(s, ana, outro.id, r00.id)
+    assert documentos.remover_arquivo(s, bia, r00.id) == r00.chave
+    with pytest.raises(SemPermissao):
+        documentos.remover_arquivo(s, cenario["cli"], r01.id)
+
+
+def test_data_do_item(s, cenario):
+    p, bia = cenario["p"], cenario["bia"]
+    dia = datetime.date(2026, 9, 1)
+    layout = documentos.atualizar(s, bia, _doc(s, bia, p, "Layout").id, situacao="Recebido", data_recebimento=dia)
+    assert layout.data_recebimento == dia
+    layout = documentos.atualizar(s, bia, layout.id, data_recebimento=datetime.date(2026, 9, 3))
+    assert layout.data_recebimento == datetime.date(2026, 9, 3)
+    with pytest.raises(ValueError, match="Só itens recebidos"):
+        documentos.atualizar(s, bia, _doc(s, bia, p, "BEP / EIR").id, data_recebimento=dia)
 
 
 def test_permissoes(s, cenario):
@@ -104,7 +136,7 @@ def test_permissoes(s, cenario):
         documentos.listar(s, ze, p)
     outro = projetos.criar(s, cenario["ana"], "Outro", "Y")
     with pytest.raises(NaoEncontrado):  # documento de outro projeto pela rota errada
-        documentos.anexo(s, cenario["ana"], outro.id, layout.id, 0)
+        documentos.atualizar(s, cenario["ana"], layout.id, situacao="N/A", projeto_id=outro.id)
 
 
 def test_excluir_projeto_leva_os_documentos(s, cenario):

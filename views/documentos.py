@@ -13,27 +13,39 @@ from urllib.parse import quote
 import flet as ft
 
 import tema
-from config import UPLOAD_DIR
+from config import RELATORIOS_DIR, UPLOAD_DIR, limpar_relatorios_antigos
 from database import (
     anexar_documento,
     atualizar_documento,
     criar_documento,
+    definir_data_arquivo_documento,
     documento_tem_anexo,
     excluir_documento,
-    listar_documentos,
+    listar_documentos_com_arquivos,
     nivel_no_projeto,
-    remover_anexo_documento,
+    remover_arquivo_documento,
 )
 from layout import col, largura_dialogo, opcoes_dialogo, rotulo
 from models import NIVEL_PAPEL
 from nucleo.armazenamento import TAMANHO_MAXIMO_ANEXO, armazenamento_padrao, nome_seguro
-from nucleo.servicos.documentos import anexos_do_documento, resumo
+from nucleo.servicos.documentos import resumo
 from nucleo.tabelas import DOC_NA, DOC_PENDENTE, DOC_RECEBIDO
 from seguranca import assinar_token, segredo_do_servidor
 
 TODOS = "Todos"
 ICONES = {DOC_RECEBIDO: ft.Icons.CHECK_CIRCLE, DOC_PENDENTE: ft.Icons.SCHEDULE, DOC_NA: ft.Icons.BLOCK}
 FILTROS = {TODOS: None, "Pendentes": DOC_PENDENTE, "Recebidos": DOC_RECEBIDO, "N/A": DOC_NA}
+
+
+def ler_data(texto: str) -> datetime.date:
+    """'dd/mm/aaaa' -> date. Vazio = hoje. Formato inválido -> ValueError com mensagem clara."""
+    texto = (texto or "").strip()
+    if not texto:
+        return datetime.date.today()
+    try:
+        return datetime.datetime.strptime(texto, "%d/%m/%Y").date()
+    except ValueError:
+        raise ValueError("Use a data no formato dd/mm/aaaa.") from None
 
 
 def texto_resumo(contagem: dict) -> str:
@@ -77,7 +89,45 @@ def build_documentos_view(page, projeto, usuario, on_logout, on_voltar):
             if caminho:
                 abrir_arquivo_nativo(str(caminho))
 
-    async def anexar(doc):
+    input_data_anexo = ft.TextField(label="Data de recebimento", hint_text="dd/mm/aaaa",
+                                    keyboard_type=ft.KeyboardType.DATETIME, prefix_icon=ft.Icons.EVENT)
+    texto_anexo = ft.Text("", size=13)
+    mensagem_anexo = ft.Text("", size=12, color=ft.Colors.ERROR)
+    anexando = {"doc": None}
+
+    def abrir_anexar(doc):
+        anexando["doc"] = doc
+        texto_anexo.value = f"Arquivo(s) para “{doc.nome}”. Informe quando foram recebidos (do cliente ou de quem enviou)."
+        input_data_anexo.value = f"{datetime.date.today():%d/%m/%Y}"
+        mensagem_anexo.value = ""
+        page.show_dialog(modal_anexar)
+
+    async def escolher_e_enviar(_):
+        try:
+            data = ler_data(input_data_anexo.value)
+            if data > datetime.date.today():
+                raise ValueError("A data de recebimento não pode ser futura.")
+        except ValueError as erro:
+            mensagem_anexo.value = str(erro)
+            page.update()
+            return
+        page.pop_dialog()
+        await enviar_arquivos(anexando["doc"], data)
+
+    modal_anexar = ft.AlertDialog(
+        **opcoes_dialogo(page),
+        title=ft.Text("Anexar arquivo"),
+        content=ft.Container(
+            width=largura_dialogo(page, 440),
+            content=ft.Column(tight=True, controls=[texto_anexo, input_data_anexo, mensagem_anexo]),
+        ),
+        actions=[
+            ft.TextButton(content="Cancelar", on_click=lambda _: page.pop_dialog()),
+            ft.Button(content="Escolher arquivos", icon=ft.Icons.UPLOAD_FILE, on_click=escolher_e_enviar),
+        ],
+    )
+
+    async def enviar_arquivos(doc, data_recebimento):
         from views.timeline import _aguardar_upload
 
         arquivos = await file_picker.pick_files(allow_multiple=True, with_data=not page.web)
@@ -103,13 +153,79 @@ def build_documentos_view(page, projeto, usuario, on_logout, on_voltar):
                 else:
                     dados = arquivo.bytes if arquivo.bytes is not None else Path(arquivo.path).read_bytes()
                     armazenamento_padrao().salvar(chave, dados)
-                anexar_documento(doc.id, chave, usuario.id)
+                anexar_documento(doc.id, chave, usuario.id, data_recebimento=data_recebimento,
+                                 nome=nome_seguro(arquivo.name))
             except (OSError, ValueError, PermissionError, TimeoutError) as erro:
                 armazenamento_padrao().apagar([chave])
                 erros.append(f"{arquivo.name}: {erro}")
         mensagem.color = ft.Colors.ERROR
         mensagem.value = "Não foi possível anexar: " + "; ".join(erros) if erros else ""
         carregar()
+
+    # ---------------------------------------------------------------- data de um arquivo
+    input_data_arquivo = ft.TextField(label="Recebido em", hint_text="dd/mm/aaaa", prefix_icon=ft.Icons.EVENT)
+    mensagem_data = ft.Text("", size=12, color=ft.Colors.ERROR)
+    arquivo_em_edicao = {"arq": None}
+
+    def abrir_data_arquivo(arq):
+        arquivo_em_edicao["arq"] = arq
+        modal_data.title = ft.Text(f"Data de recebimento · {arq.nome}")
+        input_data_arquivo.value = f"{arq.data_recebimento:%d/%m/%Y}"
+        mensagem_data.value = ""
+        page.show_dialog(modal_data)
+
+    def salvar_data_arquivo(_):
+        try:
+            definir_data_arquivo_documento(arquivo_em_edicao["arq"].id, ler_data(input_data_arquivo.value), usuario.id)
+        except (ValueError, PermissionError) as erro:
+            mensagem_data.value = str(erro)
+            page.update()
+            return
+        page.pop_dialog()
+        carregar()
+
+    modal_data = ft.AlertDialog(
+        **opcoes_dialogo(page),
+        title=ft.Text(""),
+        content=ft.Container(width=largura_dialogo(page, 400),
+                             content=ft.Column(tight=True, controls=[input_data_arquivo, mensagem_data])),
+        actions=[
+            ft.TextButton(content="Cancelar", on_click=lambda _: page.pop_dialog()),
+            ft.Button(content="Salvar", icon=ft.Icons.SAVE, on_click=salvar_data_arquivo),
+        ],
+    )
+
+    # ---------------------------------------------------------------- PDF da lista
+    async def gerar_pdf(_):
+        from nucleo.db import nova_sessao
+        from nucleo.servicos.relatorios import pdf_documentos
+        from nucleo.servicos.usuarios import ator_por_id
+
+        try:
+            with nova_sessao() as s:
+                nome, conteudo = pdf_documentos(s, ator_por_id(s, usuario.id), projeto.id)
+        except (ValueError, PermissionError, ImportError) as erro:
+            mensagem.color = ft.Colors.ERROR
+            mensagem.value = f"Não foi possível gerar o PDF: {erro}"
+            page.update()
+            return
+        relativo = f"relatorios/{uuid.uuid4().hex}/{nome}"
+        destino = RELATORIOS_DIR.parent / relativo
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        destino.write_bytes(conteudo)
+        limpar_relatorios_antigos()
+        if page.web:
+            token = assinar_token(segredo_do_servidor(), {"p": relativo}, validade_s=900)
+            resultado = page.launch_url(f"/anexo/{quote(token)}")
+            if inspect.isawaitable(resultado):
+                await resultado
+        else:
+            from views.timeline import abrir_arquivo_nativo
+
+            abrir_arquivo_nativo(str(destino))
+        mensagem.color = tema.sucesso(page)
+        mensagem.value = "PDF gerado."
+        page.update()
 
     # ---------------------------------------------------------------- confirmação genérica
     texto_confirmar = ft.Text("")
@@ -147,13 +263,12 @@ def build_documentos_view(page, projeto, usuario, on_logout, on_voltar):
             mensagem.value = str(erro)
         carregar()
 
-    def remover_arquivo(doc, indice, nome):
+    def remover_arquivo(doc, arq):
         def fazer():
             def acao():
-                chave = remover_anexo_documento(doc.id, indice, usuario.id)
-                armazenamento_padrao().apagar([chave])
+                armazenamento_padrao().apagar([remover_arquivo_documento(arq.id, usuario.id)])
             _tentar(acao)
-        confirmar("Remover arquivo", f"Remover “{nome}” de “{doc.nome}”? O arquivo será apagado.", fazer)
+        confirmar("Remover arquivo", f"Remover “{arq.nome}” de “{doc.nome}”? O arquivo será apagado.", fazer)
 
     def excluir(doc):
         def fazer():
@@ -167,6 +282,7 @@ def build_documentos_view(page, projeto, usuario, on_logout, on_voltar):
     input_nome = ft.TextField(label="Documento ou informação", hint_text="Ex.: Licença ambiental prévia")
     input_obs = ft.TextField(label="Observação (opcional)", multiline=True, min_lines=2, max_lines=5,
                              hint_text="Ex.: recebido por e-mail do cliente, revisão R02")
+    input_data_item = ft.TextField(label="Recebido em", hint_text="dd/mm/aaaa", prefix_icon=ft.Icons.EVENT)
     mensagem_form = ft.Text("", size=12, color=ft.Colors.ERROR)
     editando = {"doc": None}
 
@@ -177,6 +293,9 @@ def build_documentos_view(page, projeto, usuario, on_logout, on_voltar):
         input_nome.disabled = bool(doc and doc.padrao)  # itens padrão mantêm o nome
         input_nome.helper = "Item da lista padrão: o nome não muda." if doc and doc.padrao else None
         input_obs.value = doc.observacao if doc else ""
+        recebido = bool(doc and doc.situacao == DOC_RECEBIDO)
+        input_data_item.visible = recebido  # só itens recebidos têm data
+        input_data_item.value = f"{doc.data_recebimento:%d/%m/%Y}" if recebido and doc.data_recebimento else ""
         mensagem_form.value = ""
         page.show_dialog(modal_form)
 
@@ -186,8 +305,11 @@ def build_documentos_view(page, projeto, usuario, on_logout, on_voltar):
             if doc is None:
                 criar_documento(projeto.id, input_nome.value, input_obs.value, usuario.id)
             else:
-                atualizar_documento(doc.id, usuario.id, observacao=input_obs.value or "",
-                                    nome=None if doc.padrao else input_nome.value)
+                atualizar_documento(
+                    doc.id, usuario.id, observacao=input_obs.value or "",
+                    nome=None if doc.padrao else input_nome.value,
+                    data_recebimento=ler_data(input_data_item.value) if input_data_item.visible else None,
+                )
         except (ValueError, PermissionError) as erro:
             mensagem_form.value = str(erro)
             page.update()
@@ -200,7 +322,7 @@ def build_documentos_view(page, projeto, usuario, on_logout, on_voltar):
         title=ft.Text(""),
         content=ft.Container(
             width=largura_dialogo(page, 520),
-            content=ft.Column(tight=True, controls=[input_nome, input_obs, mensagem_form]),
+            content=ft.Column(tight=True, controls=[input_nome, input_data_item, input_obs, mensagem_form]),
         ),
         actions=[
             ft.TextButton(content="Cancelar", on_click=lambda _: page.pop_dialog()),
@@ -213,7 +335,7 @@ def build_documentos_view(page, projeto, usuario, on_logout, on_voltar):
         nova = (evento.control.selected or [doc.situacao])[0]
         _tentar(lambda: atualizar_documento(doc.id, usuario.id, situacao=nova))
 
-    def cartao(doc):
+    def cartao(doc, arquivos_doc):
         if pode_editar:
             situacao = ft.SegmentedButton(
                 selected=[doc.situacao],
@@ -237,21 +359,25 @@ def build_documentos_view(page, projeto, usuario, on_logout, on_voltar):
             detalhes.append(ft.Text(doc.observacao, size=13))
 
         arquivos = []
-        for i, chave in enumerate(anexos_do_documento(doc)):
-            nome = chave.rsplit("/", 1)[-1]
-            arquivos.append(ft.Row(spacing=0, tight=True, controls=[
-                ft.TextButton(content=nome, icon=ft.Icons.ATTACH_FILE,
-                              on_click=lambda _, c=chave: abrir_arquivo(c)),
-                *([ft.IconButton(icon=ft.Icons.CLOSE, icon_size=16, tooltip="Remover arquivo",
-                                 on_click=lambda _, d=doc, i=i, n=nome: remover_arquivo(d, i, n))]
-                  if pode_editar else []),
+        for arq in arquivos_doc:
+            arquivos.append(ft.Row(spacing=0, wrap=True, vertical_alignment=ft.CrossAxisAlignment.CENTER, controls=[
+                ft.TextButton(content=arq.nome, icon=ft.Icons.ATTACH_FILE,
+                              on_click=lambda _, c=arq.chave: abrir_arquivo(c)),
+                ft.Text(f"recebido em {arq.data_recebimento:%d/%m/%Y}", size=12,
+                        color=ft.Colors.ON_SURFACE_VARIANT),
+                *([
+                    ft.IconButton(icon=ft.Icons.EDIT_CALENDAR, icon_size=16, tooltip="Corrigir a data de recebimento",
+                                  on_click=lambda _, a=arq: abrir_data_arquivo(a)),
+                    ft.IconButton(icon=ft.Icons.CLOSE, icon_size=16, tooltip="Remover arquivo",
+                                  on_click=lambda _, d=doc, a=arq: remover_arquivo(d, a)),
+                ] if pode_editar else []),
             ]))
 
         acoes = []
         if pode_editar:
             acoes = [
                 ft.TextButton(content="Anexar arquivo", icon=ft.Icons.UPLOAD_FILE,
-                              on_click=lambda _, d=doc: anexar(d)),
+                              on_click=lambda _, d=doc: abrir_anexar(d)),
                 ft.TextButton(content="Editar", icon=ft.Icons.EDIT_OUTLINED,
                               on_click=lambda _, d=doc: abrir_formulario(d)),
             ]
@@ -285,13 +411,14 @@ def build_documentos_view(page, projeto, usuario, on_logout, on_voltar):
         )
 
     def carregar():
-        documentos = listar_documentos(projeto.id, usuario.id)
+        pares = listar_documentos_com_arquivos(projeto.id, usuario.id)
+        documentos = [d for d, _ in pares]
         contagem = resumo(documentos)
         resumo_texto.value = texto_resumo(contagem)
         progresso.value = contagem[DOC_RECEBIDO] / contagem["aplicaveis"] if contagem["aplicaveis"] else 1
         escolhido = FILTROS.get(filtro.value)
-        visiveis = [d for d in documentos if not escolhido or d.situacao == escolhido]
-        lista.controls = [cartao(d) for d in visiveis] or [
+        visiveis = [(d, a) for d, a in pares if not escolhido or d.situacao == escolhido]
+        lista.controls = [cartao(d, a) for d, a in visiveis] or [
             ft.Text("Nenhum item nesta situação.", color=ft.Colors.ON_SURFACE_VARIANT)
         ]
         page.update()
@@ -320,6 +447,8 @@ def build_documentos_view(page, projeto, usuario, on_logout, on_voltar):
                     controls=[
                         tema.botao_secundario(rotulo(page, "Ficha do Empreendimento", "Ficha"),
                                               ft.Icons.ASSIGNMENT, on_voltar),
+                        tema.botao_secundario("PDF", ft.Icons.PICTURE_AS_PDF, gerar_pdf,
+                                              tooltip="Lista de documentos em PDF"),
                         tema.botao_destaque(rotulo(page, "+ Novo Item", "+ Item"), ft.Icons.ADD_CIRCLE_OUTLINE,
                                             lambda _: abrir_formulario(None), visible=pode_editar),
                         ft.IconButton(icon=ft.Icons.LOGOUT, tooltip="Sair", on_click=on_logout),

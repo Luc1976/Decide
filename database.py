@@ -442,6 +442,12 @@ def listar_documentos(projeto_id: int, usuario_id: int) -> list:
         return s_documentos.listar(s, _ator(s, usuario_id), projeto_id)
 
 
+def listar_documentos_com_arquivos(projeto_id: int, usuario_id: int) -> list:
+    """[(documento, [arquivos com data de recebimento])]."""
+    with nova_sessao() as s:
+        return s_documentos.listar_com_arquivos(s, _ator(s, usuario_id), projeto_id)
+
+
 def resumo_documentos(projeto_id: int, usuario_id: int) -> dict:
     with nova_sessao() as s:
         return s_documentos.resumo_do_projeto(s, _ator(s, usuario_id), projeto_id)
@@ -452,10 +458,11 @@ def criar_documento(projeto_id: int, nome: str, observacao: str, usuario_id: int
         return s_documentos.criar(s, _ator(s, usuario_id), projeto_id, nome, observacao)
 
 
-def atualizar_documento(documento_id: int, usuario_id: int, situacao=None, observacao=None, nome=None):
+def atualizar_documento(documento_id: int, usuario_id: int, situacao=None, observacao=None, nome=None,
+                        data_recebimento=None):
     with nova_sessao() as s:
-        return s_documentos.atualizar(s, _ator(s, usuario_id), documento_id,
-                                      situacao=situacao, observacao=observacao, nome=nome)
+        return s_documentos.atualizar(s, _ator(s, usuario_id), documento_id, situacao=situacao,
+                                      observacao=observacao, nome=nome, data_recebimento=data_recebimento)
 
 
 def excluir_documento(documento_id: int, usuario_id: int) -> list:
@@ -464,14 +471,21 @@ def excluir_documento(documento_id: int, usuario_id: int) -> list:
         return s_documentos.excluir(s, _ator(s, usuario_id), documento_id)
 
 
-def anexar_documento(documento_id: int, chave: str, usuario_id: int):
+def anexar_documento(documento_id: int, chave: str, usuario_id: int, data_recebimento=None, nome=None):
     with nova_sessao() as s:
-        return s_documentos.anexar(s, _ator(s, usuario_id), documento_id, chave)
+        return s_documentos.anexar(s, _ator(s, usuario_id), documento_id, chave,
+                                   data_recebimento=data_recebimento, nome=nome)
 
 
-def remover_anexo_documento(documento_id: int, indice: int, usuario_id: int) -> str:
+def definir_data_arquivo_documento(arquivo_id: int, data_recebimento, usuario_id: int):
     with nova_sessao() as s:
-        return s_documentos.remover_anexo(s, _ator(s, usuario_id), documento_id, indice)[1]
+        return s_documentos.definir_data_arquivo(s, _ator(s, usuario_id), arquivo_id, data_recebimento)
+
+
+def remover_arquivo_documento(arquivo_id: int, usuario_id: int) -> str:
+    """Devolve a chave do arquivo, para apagar do disco."""
+    with nova_sessao() as s:
+        return s_documentos.remover_arquivo(s, _ator(s, usuario_id), arquivo_id)
 
 
 def documento_tem_anexo(projeto_id: int, chave: str) -> bool:

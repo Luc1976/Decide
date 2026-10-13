@@ -39,6 +39,8 @@ COR_IMPACTO = {
     "Baixo": colors.HexColor("#1B7F3B"),
 }
 
+COR_SITUACAO_DOC = {"Recebido": "#1B7F3B", "Pendente": "#9A6700", "N/A": "#5F6B7A"}
+
 _SUBSTITUICOES = {
     "→": "->", "←": "<-", "≥": ">=", "≤": "<=", "≠": "!=", "✓": "[x]", "✔": "[x]",
     "☐": "[ ]", "☑": "[x]", "•": "-", "…": "...", "\u00a0": " ", "\u200b": "",
@@ -248,6 +250,85 @@ def _bloco_decisao(decisao, estilos, atas_por_id, alteracoes, incluir_detalhes):
     return [CondPageBreak(4.5 * cm), KeepTogether(primeiro)] + resto + [Spacer(1, 6), HRFlowable(width="100%", thickness=0.3, color=colors.HexColor("#D5DAE1")), Spacer(1, 4)]
 
 
+def nome_do_arquivo_documentos(projeto_nome: str, quando: datetime) -> str:
+    return nome_do_arquivo(projeto_nome, quando).replace("Relatorio-decisoes-", "Documentos-referencia-", 1)
+
+
+def _resumo_documentos(documentos) -> str:
+    situacoes = [d.situacao for d, _ in documentos]
+    aplicaveis = len(situacoes) - situacoes.count("N/A")
+    texto = f"{situacoes.count('Recebido')} de {aplicaveis} recebidos · {situacoes.count('Pendente')} pendente(s)"
+    if situacoes.count("N/A"):
+        texto += f" · {situacoes.count('N/A')} não se aplica(m)"
+    return texto
+
+
+def _secao_documentos(documentos, estilos, com_titulo: bool = True):
+    """Tabela do checklist. documentos: [(documento, [arquivos])], cada arquivo com nome e
+    data_recebimento. Uma linha por item; os arquivos aparecem com a data em que chegaram."""
+    if not documentos:
+        return []
+    elementos = []
+    if com_titulo:  # no PDF próprio o resumo já está no quadro do topo
+        elementos += _titulo_secao("Documentos de referência", estilos, 5 * cm)
+        elementos += [Paragraph(_p(_resumo_documentos(documentos)), estilos["pequeno"]), Spacer(1, 4)]
+    cabecalho = [Paragraph(f'<font color="#FFFFFF"><b>{t}</b></font>', estilos["rotulo"])
+                 for t in ("Documento / informação", "Situação", "Recebido em", "Arquivos recebidos")]
+    linhas = [cabecalho]
+    for doc, arquivos in documentos:
+        nome = f"<b>{_p(doc.nome)}</b>"
+        if doc.observacao:
+            nome += f'<br/><font size="8" color="#5F6B7A">{_p(doc.observacao)}</font>'
+        cor = COR_SITUACAO_DOC.get(doc.situacao, "#5F6B7A")
+        situacao = f'<font color="{cor}"><b>{_p("Não se aplica" if doc.situacao == "N/A" else doc.situacao)}</b></font>'
+        quando = f"{doc.data_recebimento:%d/%m/%Y}" if doc.situacao == "Recebido" and doc.data_recebimento else "-"
+        lista = "<br/>".join(f"{_p(a.nome)} <font color=\"#5F6B7A\">({a.data_recebimento:%d/%m/%Y})</font>"
+                             for a in arquivos) or "-"
+        linhas.append([Paragraph(nome, estilos["rotulo"]), Paragraph(situacao, estilos["rotulo"]),
+                       Paragraph(quando, estilos["rotulo"]), Paragraph(lista, estilos["rotulo"])])
+    tabela = Table(linhas, colWidths=[5.3 * cm, 2.3 * cm, 2.7 * cm, 6.7 * cm], repeatRows=1)
+    estilo = [
+        ("BACKGROUND", (0, 0), (-1, 0), AZUL),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.HexColor("#D5DAE1")),
+        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]
+    estilo += [("BACKGROUND", (0, i), (-1, i), CINZA_CLARO) for i in range(2, len(linhas), 2)]
+    tabela.setStyle(TableStyle(estilo))
+    elementos.append(tabela)
+    return elementos
+
+
+def gerar_documentos_pdf(destino: Path, projeto, documentos, gerado_por: str, nome_app: str = "Memória de Projetos",
+                         agora: datetime = None, logo_empresa=None, logo_cliente=None) -> int:
+    """PDF só com o checklist de documentos de referência. Devolve quantos itens entraram."""
+    agora = agora or datetime.now()
+    estilos = _estilos()
+    logos = _ler_logos(logo_empresa, logo_cliente)
+    story = [
+        Paragraph("Documentos de Referência", estilos["titulo"]),
+        Paragraph(_p(projeto.nome), estilos["subtitulo"]),
+        _tabela_chave_valor(
+            [("Cliente", projeto.cliente),
+             ("Gerado em", f"{agora:%d/%m/%Y às %H:%M}"),
+             ("Gerado por", gerado_por),
+             ("Situação", _resumo_documentos(documentos) if documentos else "Nenhum item")],
+            estilos,
+        ),
+        Spacer(1, 10),
+        *_secao_documentos(documentos, estilos, com_titulo=False),
+    ]
+    destino = Path(destino)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    documento = SimpleDocTemplate(
+        str(destino), pagesize=A4, leftMargin=2 * cm, rightMargin=2 * cm, topMargin=margem_superior(logos),
+        bottomMargin=2.3 * cm, title=_limpo(f"Documentos de Referência - {projeto.nome}"),
+        author=_limpo(gerado_por), subject=_limpo(nome_app),
+    )
+    documento.build(story, canvasmaker=_canvas_com_rodape(f"{nome_app}  |  {projeto.nome}", logos))
+    return len(documentos)
+
+
 def _secao_ficha(caracteristicas, estilos):
     por_chave = {(c.grupo, c.nome): c for c in caracteristicas if (c.valor or "").strip()}
     if not por_chave:
@@ -288,9 +369,11 @@ def gerar_relatorio_pdf(
     agora: datetime = None,
     logo_empresa=None,
     logo_cliente=None,
+    documentos=None,
 ) -> int:
     """Grava o PDF em 'destino' e devolve quantas decisões entraram.
-    logo_empresa / logo_cliente: caminhos de imagens para o cabeçalho (opcionais)."""
+    logo_empresa / logo_cliente: caminhos de imagens para o cabeçalho (opcionais).
+    documentos: [(documento, [arquivos])] para a seção Documentos de referência (opcional)."""
     agora = agora or datetime.now()
     estilos = _estilos()
     logos = _ler_logos(logo_empresa, logo_cliente)
@@ -325,6 +408,8 @@ def gerar_relatorio_pdf(
 
     if incluir_ficha:
         story += _secao_ficha(caracteristicas, estilos)
+    if documentos:
+        story += _secao_documentos(documentos, estilos)
 
     story += _titulo_secao("Decisões (ordem cronológica)", estilos, 7 * cm)
     if not decisoes:

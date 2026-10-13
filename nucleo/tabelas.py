@@ -227,11 +227,22 @@ class DocumentoReferencia(SQLModel, table=True):
     padrao: bool = Field(default=False)   # veio da lista padrão (não pode ser excluído)
     ordem: int = 0
     observacao: str = ""                  # ex.: "recebido por e-mail, revisão R02"
-    anexos: Optional[str] = None          # chaves dos arquivos, separadas por vírgula
-    data_recebimento: Optional[datetime.date] = None
+    data_recebimento: Optional[datetime.date] = None  # quando o item foi recebido (editável)
     recebido_por: str = ""
     atualizado_por: str = ""
     data_atualizacao: datetime.datetime = Field(default_factory=_agora)
+
+
+class DocumentoArquivo(SQLModel, table=True):
+    """Arquivo recebido para um item dos documentos de referência, com a DATA EM QUE FOI
+    RECEBIDO (informada por quem anexa; pode ser anterior ao envio para o app)."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    documento_id: int = Field(foreign_key="documentoreferencia.id", index=True)
+    chave: str                            # caminho no armazenamento (uploads/p<id>/...)
+    nome: str                             # nome do arquivo, para exibir
+    data_recebimento: datetime.date
+    enviado_por: str = ""
+    data_envio: datetime.datetime = Field(default_factory=_agora)
 
 
 # ---------------------------------------------------------------- auditoria (tabela nova)

@@ -224,10 +224,22 @@ def test_documentos_de_referencia(cliente, equipe):
     chave = cliente.post(f"{V}/projetos/{pid}/anexos", files={"arquivo": ("bep.pdf", b"%PDF-bep", "application/pdf")},
                          headers=bia).json()["chave"]
     bep = next(d for d in lista if d["nome"] == "BEP / EIR")
-    r = cliente.post(f"{V}/projetos/{pid}/documentos/{bep['id']}/anexos", json={"chave": chave}, headers=bia)
-    assert r.json()["situacao"] == "Recebido" and r.json()["anexos"] == [{"indice": 0, "nome": "bep.pdf"}]
-    url = cliente.get(f"{V}/projetos/{pid}/documentos/{bep['id']}/anexos/0/link", headers=cli).json()["url"]
+    r = cliente.post(f"{V}/projetos/{pid}/documentos/{bep['id']}/arquivos",
+                     json={"chave": chave, "data_recebimento": "2026-09-15"}, headers=bia)
+    assert r.status_code == 201 and r.json()["data_recebimento"] == "2026-09-15"
+    arq = r.json()["id"]
+    bep = next(d for d in cliente.get(f"{V}/projetos/{pid}/documentos", headers=cli).json() if d["id"] == bep["id"])
+    assert bep["situacao"] == "Recebido" and bep["data_recebimento"] == "2026-09-15"
+    assert [a["nome"] for a in bep["arquivos"]] == ["bep.pdf"]
+    r = cliente.put(f"{V}/projetos/{pid}/documentos/{bep['id']}/arquivos/{arq}",
+                    json={"data_recebimento": "2026-09-10"}, headers=bia)
+    assert r.json()["data_recebimento"] == "2026-09-10"
+    assert cliente.put(f"{V}/projetos/{pid}/documentos/{layout['id']}/arquivos/{arq}",
+                       json={"data_recebimento": "2026-09-10"}, headers=bia).status_code == 404  # outro item
+    url = cliente.get(f"{V}/projetos/{pid}/documentos/{bep['id']}/arquivos/{arq}/link", headers=cli).json()["url"]
     assert cliente.get(url).content == b"%PDF-bep"
+    pdf = cliente.get(f"{V}/projetos/{pid}/documentos/relatorio.pdf", headers=cli)
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
 
     novo = cliente.post(f"{V}/projetos/{pid}/documentos", json={"nome": "Licença ambiental"}, headers=bia).json()
     assert cliente.delete(f"{V}/projetos/{pid}/documentos/{layout['id']}", headers=bia).status_code == 409

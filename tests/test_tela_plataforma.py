@@ -26,6 +26,9 @@ class PaginaFalsa:
     def update(self, *_):
         pass
 
+    def launch_url(self, url, *_, **__):
+        self.links = getattr(self, "links", []) + [url]
+
     @property
     def dialogo(self):
         return self.dialogos[-1] if self.dialogos else None

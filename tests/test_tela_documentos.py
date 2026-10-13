@@ -95,25 +95,75 @@ def test_item_padrao_nao_exclui_nem_renomeia(cenario):
     assert _campo(pagina.dialogo, "Documento ou informação").disabled is True
 
 
-def test_anexar_arquivo_marca_recebido(cenario):
+def _arquivos(projeto, usuario, nome):
+    return next(a for d, a in db.listar_documentos_com_arquivos(projeto.id, usuario.id) if d.nome == nome)
+
+
+def test_anexar_com_data_de_recebimento(cenario):
+    import datetime
+
     lucas, projeto = cenario
     pagina = PaginaFalsa()
     pagina.web = False  # modo app: o arquivo chega em bytes
     _, view = _tela(lucas, projeto, pagina)
-    seletor_arquivos = view.services[0]
 
     async def escolher(**_):
         return [SimpleNamespace(id=1, name="topografia R01.pdf", size=4, bytes=b"%PDF", path=None)]
 
-    seletor_arquivos.pick_files = escolher
-    botao = next(b for b in _todos(_cartao(view, "Levantamento topográfico"))
-                 if isinstance(b, ft.TextButton) and b.content == "Anexar arquivo")
-    asyncio.run(botao.on_click(None))
+    view.services[0].pick_files = escolher
+    _clicar(_cartao(view, "Levantamento topográfico"), "Anexar arquivo")
+    dialogo = pagina.dialogo
+    data = _campo(dialogo, "Data de recebimento")
+    assert data.value == f"{datetime.date.today():%d/%m/%Y}"  # hoje, já preenchido
+    data.value = "31/12/2099"
+    asyncio.run(next(b for b in _todos(dialogo) if isinstance(b, ft.Button) and b.content == "Escolher arquivos")
+                .on_click(None))
+    assert "futura" in _textos(dialogo) and pagina.dialogo is dialogo
+    data.value = "02/09/2026"
+    asyncio.run(next(b for b in _todos(dialogo) if isinstance(b, ft.Button) and b.content == "Escolher arquivos")
+                .on_click(None))
+
+    [arq] = _arquivos(projeto, lucas, "Levantamento topográfico")
+    assert (arq.nome, arq.data_recebimento) == ("topografia R01.pdf", datetime.date(2026, 9, 2))
     doc = _doc(projeto, lucas, "Levantamento topográfico")
-    assert doc.situacao == "Recebido" and doc.anexos.startswith(f"uploads/p{projeto.id}/")
-    assert armazenamento_padrao().ler(doc.anexos) == b"%PDF"
-    assert any(isinstance(b, ft.TextButton) and b.content == "topografia R01.pdf" for b in _todos(view))
-    armazenamento_padrao().apagar([doc.anexos])
+    assert (doc.situacao, doc.data_recebimento) == ("Recebido", datetime.date(2026, 9, 2))
+    assert armazenamento_padrao().ler(arq.chave) == b"%PDF"
+    cartao = _cartao(view, "Levantamento topográfico")
+    assert any(isinstance(b, ft.TextButton) and b.content == "topografia R01.pdf" for b in _todos(cartao))
+    assert "recebido em 02/09/2026" in _textos(cartao)
+
+    # corrigir a data do arquivo
+    next(b for b in _todos(cartao) if isinstance(b, ft.IconButton) and b.tooltip == "Corrigir a data de recebimento"
+         ).on_click(None)
+    _campo(pagina.dialogo, "Recebido em").value = "01/09/2026"
+    _clicar(pagina.dialogo, "Salvar")
+    assert _arquivos(projeto, lucas, "Levantamento topográfico")[0].data_recebimento == datetime.date(2026, 9, 1)
+
+    # corrigir a data do item
+    _clicar(_cartao(view, "Levantamento topográfico"), "Editar")
+    campo = _campo(pagina.dialogo, "Recebido em")
+    assert campo.visible and campo.value == "02/09/2026"
+    campo.value = "30/08/2026"
+    _clicar(pagina.dialogo, "Salvar")
+    assert _doc(projeto, lucas, "Levantamento topográfico").data_recebimento == datetime.date(2026, 8, 30)
+    armazenamento_padrao().apagar([arq.chave])
+
+
+def test_pendente_nao_mostra_data_no_editar(cenario):
+    lucas, projeto = cenario
+    pagina, view = _tela(lucas, projeto)
+    _clicar(_cartao(view, "Layout"), "Editar")
+    assert _campo(pagina.dialogo, "Recebido em").visible is False
+
+
+def test_botao_pdf_gera_e_abre(cenario):
+    lucas, projeto = cenario
+    pytest.importorskip("reportlab")
+    pagina, view = _tela(lucas, projeto)
+    botao = next(b for b in _todos(view) if isinstance(b, ft.FilledTonalButton) and b.content == "PDF")
+    asyncio.run(botao.on_click(None))
+    assert pagina.links and pagina.links[0].startswith("/anexo/")
+    assert "PDF gerado." in _textos(view)
 
 
 def test_cliente_so_acompanha(cenario):

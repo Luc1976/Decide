@@ -14,6 +14,7 @@ import flet as ft
 
 import tema
 from database import (
+    listar_documentos_com_arquivos,
     Reuniao,
     adicionar_decisao,
     alteracoes_ficha_por_decisao,
@@ -386,6 +387,8 @@ def build_timeline_view(
     rel_data_fim = ft.TextField(label="Até (dd/mm/aaaa)", col=col(12, md=6))
     rel_categoria = ft.Dropdown(label="Categoria", options=[], value=TODAS)
     rel_incluir_ficha = ft.Checkbox(label="Incluir a ficha do empreendimento", value=True)
+    rel_incluir_documentos = ft.Checkbox(label="Incluir os documentos de referência (com datas de recebimento)",
+                                         value=True)
     rel_incluir_detalhes = ft.Checkbox(
         label="Incluir justificativa, alternativas e checklist", value=True
     )
@@ -488,6 +491,7 @@ def build_timeline_view(
                 None,
                 logo_empresa(projeto.organizacao_id),
                 logo_projeto(projeto.id),
+                listar_documentos_com_arquivos(projeto.id, usuario.id) if rel_incluir_documentos.value else None,
             )
         except Exception as erro:
             rel_mensagem.color = ft.Colors.ERROR
@@ -524,6 +528,7 @@ def build_timeline_view(
                     ft.ResponsiveRow([rel_data_ini, rel_data_fim]),
                     rel_categoria,
                     rel_incluir_ficha,
+                    rel_incluir_documentos,
                     rel_incluir_detalhes,
                     rel_mensagem,
                     btn_baixar_relatorio,

@@ -8,6 +8,7 @@ from nucleo import auditoria
 from nucleo.ator import Ator
 from nucleo.erros import NaoEncontrado, SemPermissao
 from nucleo.permissoes import LEITOR, RESPONSAVEL, exigir, organizacao_ativa
+from nucleo.servicos.documentos import consultar_arquivos
 from nucleo.tabelas import (
     AtaAdendo,
     Caracteristica,
@@ -98,8 +99,8 @@ def resumo(s: Session, ator: Ator, projeto_id: int) -> dict:
     atas = s.exec(select(Reuniao.id).where(Reuniao.projeto_id == projeto_id)).all()
     membros = s.exec(select(MembroProjeto.id).where(MembroProjeto.projeto_id == projeto_id)).all()
     pendencias = s.exec(select(Pendencia.id).where(Pendencia.projeto_id == projeto_id)).all()
-    documentos = s.exec(select(DocumentoReferencia).where(DocumentoReferencia.projeto_id == projeto_id)).all()
-    anexos = sum(len([c for c in (d.anexos or "").split(",") if c]) for d in [*decisoes, *documentos])
+    anexos = sum(len([c for c in (d.anexos or "").split(",") if c]) for d in decisoes)
+    anexos += sum(len(lista) for lista in consultar_arquivos(s, projeto_id).values())
     return {"decisoes": len(decisoes), "atas": len(atas), "anexos": anexos,
             "membros": len(membros), "pendencias": len(pendencias)}
 
@@ -112,11 +113,14 @@ def excluir(s: Session, ator: Ator, projeto_id: int) -> List[str]:
     decisoes = s.exec(select(Decisao).where(Decisao.projeto_id == projeto_id)).all()
     reunioes = s.exec(select(Reuniao).where(Reuniao.projeto_id == projeto_id)).all()
     caminhos = [c for d in decisoes for c in (d.anexos or "").split(",") if c]
-    documentos = s.exec(select(DocumentoReferencia).where(DocumentoReferencia.projeto_id == projeto_id)).all()
-    caminhos += [c for d in documentos for c in (d.anexos or "").split(",") if c]
+    arquivos_docs = [a for lista in consultar_arquivos(s, projeto_id).values() for a in lista]
+    caminhos += [a.chave for a in arquivos_docs]
 
     # A ordem importa por causa das chaves estrangeiras: primeiro quem aponta para
     # decisões/atas, depois as decisões, depois as atas e por fim o próprio projeto.
+    for arquivo in arquivos_docs:  # antes dos documentos (chave estrangeira)
+        s.delete(arquivo)
+    s.flush()
     for tabela in (CaracteristicaHistorico, Caracteristica, PadraoConstrutivo, Pendencia, DocumentoReferencia):
         for item in s.exec(select(tabela).where(tabela.projeto_id == projeto_id)).all():
             s.delete(item)

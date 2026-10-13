@@ -54,11 +54,17 @@ Na **Ficha do Empreendimento**, botão **Documentos de referência (x/y)** (rece
 Checklist dos arquivos e informações recebidas do cliente. Todo projeto já vem com:
 Levantamento topográfico, Projetos preliminares, Layout, Relatórios de Sondagens SPT,
 Relatório de sondagem a trado (CBR), BEP / EIR e Outros (os projetos que já existiam ganham a
-lista na migração 0004).
+lista na migração 0004; a 0005 dá data a cada arquivo).
 - Situação de cada item: **Recebido**, **Pendente** ou **N/A** (não aplicável). Ao marcar
   Recebido, o app guarda a data e quem marcou.
-- **Anexar arquivo** guarda o arquivo no item e já o marca como Recebido. Observação livre
+- **Anexar arquivo** pede a **data de recebimento** (hoje, já preenchido; pode ser anterior,
+  nunca futura), guarda o arquivo no item e, se ele ainda estava pendente, marca como Recebido
+  nessa data. Cada arquivo mostra quando foi recebido (ícone de calendário corrige a data).
+  A data do item também pode ser corrigida em **Editar**. Observação livre
   (ex.: "revisão R02, enviada por e-mail").
+- **PDF**: botão na própria tela gera a lista com situação, datas e arquivos recebidos.
+  No **Relatório de Decisões** a mesma tabela entra como seção (caixa "Incluir os documentos
+  de referência", marcada por padrão).
 - **+ Novo Item** acrescenta outras informações. Itens acrescentados podem ser renomeados e
   excluídos; os da lista padrão não (marque N/A quando não se aplicarem).
 - O cliente (Leitor) acompanha a lista e baixa os arquivos, mas não altera.
