@@ -40,6 +40,16 @@ Ninguém perde acesso, mas faça assim:
 
 O administrador mais antigo (o usuário inicial) vira também **superadmin**.
 
+## Aparência: modo claro e escuro
+Ícone de sol/lua no canto superior da linha do tempo. A escolha fica guardada **no usuário**
+(vale em qualquer aparelho) e o padrão continua sendo o modo escuro. A migração 0003 cria essa
+preferência sozinha na partida (log: `Banco atualizado: versão 0002 -> 0003`).
+
+- Cores das telas: definidas em `tema.py`. Nas telas, use as cores "por papel" do tema
+  (`ft.Colors.ON_SURFACE_VARIANT`, `PRIMARY`, `ERROR`...), nunca cores fixas como `GREY_400`:
+  elas somem num dos modos. O teste `tests/test_tema.py` acusa se alguma cor fixa voltar.
+- Selos (disciplina, impacto, situação): texto escuro sobre fundo em tom médio, contraste ≥ 7.
+
 ## Plataforma: organizações (só o superadmin)
 Botão **Plataforma** no cabeçalho da linha do tempo (só aparece para o superadmin).
 - **+ Nova Organização**: nome do escritório e o primeiro administrador (nome, usuário e senha

@@ -1,6 +1,8 @@
 import datetime
 
 import flet as ft
+
+import tema
 from database import (
     listar_caracteristicas,
     nivel_no_projeto,
@@ -48,7 +50,7 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar):
                     "Preencha a área do terreno e os parâmetros (TO, CA, permeabilidade) "
                     "para ver os indicadores.",
                     size=13,
-                    color=ft.Colors.GREY_400,
+                    color=ft.Colors.ON_SURFACE_VARIANT,
                 )
             ]
             return
@@ -60,13 +62,13 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar):
                         rotulo,
                         size=13,
                         expand=True,
-                        color=ft.Colors.AMBER_600 if alerta else ft.Colors.GREY_400,
+                        color=tema.aviso(page) if alerta else ft.Colors.ON_SURFACE_VARIANT,
                     ),
                     ft.Text(
                         texto,
                         size=14,
                         weight=ft.FontWeight.BOLD,
-                        color=ft.Colors.AMBER_600 if alerta else None,
+                        color=tema.aviso(page) if alerta else None,
                     ),
                 ],
             )
@@ -115,7 +117,7 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar):
     input_novo_nome = ft.TextField(label="Nome da característica")
     input_nova_unidade = ft.TextField(label="Unidade (opcional)", col=col(12, md=4))
     input_novo_valor = ft.TextField(label="Valor", col=col(12, md=8))
-    mensagem_novo = ft.Text("", color=ft.Colors.RED_400, size=12)
+    mensagem_novo = ft.Text("", color=ft.Colors.ERROR, size=12)
 
     def abrir_novo_campo(_):
         input_novo_nome.value = ""
@@ -141,7 +143,7 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar):
             (input_novo_valor.value or "").strip(),
         )
         mensagem.value = "Característica adicionada. Clique em Salvar ficha para gravar."
-        mensagem.color = ft.Colors.AMBER_600
+        mensagem.color = tema.aviso(page)
         page.pop_dialog()
         page.update()
 
@@ -178,11 +180,11 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar):
                 projeto.id, itens, usuario.nome_completo, usuario_id=usuario.id
             )
         except Exception as erro:
-            mensagem.color = ft.Colors.RED_400
+            mensagem.color = ft.Colors.ERROR
             mensagem.value = f"Não foi possível salvar a ficha: {erro}"
             page.update()
             return
-        mensagem.color = ft.Colors.GREEN_400
+        mensagem.color = tema.sucesso(page)
         if qtd == 0:
             mensagem.value = "Nenhuma alteração para salvar."
         elif qtd == 1:
@@ -208,14 +210,14 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar):
                         f"{_hora_local(r.data_registro).strftime('%d/%m/%Y %H:%M')} · {r.autor}"
                         + (f" · {origem}" if origem else ""),
                         size=11,
-                        color=ft.Colors.GREY_400,
+                        color=ft.Colors.ON_SURFACE_VARIANT,
                     )
                 )
                 controles.append(ft.Text(f"{r.nome}: {anterior} → {novo}", size=13))
                 controles.append(ft.Divider(height=1))
         else:
             controles = [
-                ft.Text("Nenhuma alteração registrada ainda.", color=ft.Colors.GREY_400)
+                ft.Text("Nenhuma alteração registrada ainda.", color=ft.Colors.ON_SURFACE_VARIANT)
             ]
         modal_historico.content = ft.Container(
             width=largura_dialogo(page, 600),
@@ -274,9 +276,9 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar):
     )
 
     header = ft.Container(
-        padding=15,
-        bgcolor=ft.Colors.SURFACE,
-        border_radius=10,
+        padding=ft.Padding.symmetric(horizontal=18, vertical=14),
+        bgcolor=ft.Colors.SURFACE_CONTAINER,
+        border_radius=14,
         content=ft.ResponsiveRow(
             controls=[
                 ft.Column(
@@ -290,7 +292,7 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar):
                         ft.Text(
                             f"Projeto Ativo: {projeto.nome}" if projeto else "Sem projeto",
                             size=14,
-                            color=ft.Colors.BLUE_200,
+                            color=ft.Colors.PRIMARY,
                         ),
                     ]
                 ),
@@ -299,11 +301,7 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar):
                     wrap=True,
                     alignment=ft.MainAxisAlignment.END,
                     controls=[
-                        ft.Button(
-                            content="Linha do tempo",
-                            icon=ft.Icons.TIMELINE,
-                            on_click=on_voltar,
-                        ),
+                        tema.botao_secundario("Linha do tempo", ft.Icons.TIMELINE, on_voltar),
                         ft.Button(
                             content="Histórico",
                             icon=ft.Icons.HISTORY,

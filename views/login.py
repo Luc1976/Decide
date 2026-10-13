@@ -1,4 +1,5 @@
 import flet as ft
+
 from layout import compacto, largura_campo
 
 
@@ -17,7 +18,7 @@ def build_login_view(on_login, page=None):
         can_reveal_password=True,
         prefix_icon=ft.Icons.LOCK,
     )
-    msg_erro = ft.Text("", color=ft.Colors.RED_400, size=12)
+    msg_erro = ft.Text("", color=ft.Colors.ERROR, size=12)
 
     async def fazer_login(_):
         await on_login(input_user.value, input_senha.value, msg_erro)
@@ -41,7 +42,7 @@ def build_login_view(on_login, page=None):
                                 ft.Icon(
                                     ft.Icons.ARCHITECTURE,
                                     size=60,
-                                    color=ft.Colors.BLUE_400,
+                                    color=ft.Colors.PRIMARY,
                                 ),
                                 ft.Text(
                                     "Ru.A Estudio",
@@ -51,7 +52,7 @@ def build_login_view(on_login, page=None):
                                 ft.Text(
                                     "Gestão de Decisões de Projetos",
                                     size=14,
-                                    color=ft.Colors.GREY_400,
+                                    color=ft.Colors.ON_SURFACE_VARIANT,
                                 ),
                                 ft.Divider(),
                                 input_user,

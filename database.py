@@ -221,6 +221,12 @@ def listar_usuarios(solicitante_id: Optional[int] = None) -> List[Usuario]:
         return s_usuarios.listar(s, _ator(s, solicitante_id) if solicitante_id is not None else None)
 
 
+def definir_tema(usuario_id: int, tema: str) -> None:
+    """Guarda o modo (claro/escuro) escolhido pelo usuário."""
+    with nova_sessao() as s:
+        s_usuarios.definir_tema(s, _ator(s, usuario_id), tema)
+
+
 def alterar_propria_senha(usuario_id: int, senha_atual: str, nova_senha: str) -> None:
     with nova_sessao() as s:
         s_usuarios.alterar_propria_senha(s, _ator(s, usuario_id), senha_atual, nova_senha)

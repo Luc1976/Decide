@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from api.autenticacao import LIMITADOR_LOGIN, emitir_token
 from api.deps import AtorAtual, Sessao
-from api.esquemas.auth import LoginEntrada, TokenSaida, TrocaSenhaEntrada, UsuarioSaida
+from api.esquemas.auth import LoginEntrada, TemaEntrada, TokenSaida, TrocaSenhaEntrada, UsuarioSaida
 from nucleo.servicos import usuarios
 from nucleo.tabelas import Usuario
 
@@ -35,3 +35,8 @@ def eu(ator: AtorAtual, s: Sessao):
 @rotas.post("/senha", status_code=204, summary="Trocar a própria senha")
 def trocar_senha(dados: TrocaSenhaEntrada, ator: AtorAtual, s: Sessao):
     usuarios.alterar_propria_senha(s, ator, dados.senha_atual, dados.nova_senha)
+
+
+@rotas.put("/tema", response_model=UsuarioSaida, summary="Modo claro ou escuro (preferência do usuário)")
+def definir_tema(dados: TemaEntrada, ator: AtorAtual, s: Sessao):
+    return usuarios.definir_tema(s, ator, dados.tema)

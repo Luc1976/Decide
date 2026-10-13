@@ -4,6 +4,8 @@ import uuid
 from urllib.parse import quote
 
 import flet as ft
+
+import tema
 import ia_transcricao
 from ata_pdf import gerar_ata_pdf, nome_do_arquivo_ata
 from config import NOME_APP, RELATORIOS_DIR, limpar_relatorios_antigos
@@ -32,10 +34,6 @@ from layout import col, largura_dialogo, opcoes_dialogo
 from logos import logo_empresa, logo_projeto
 from ficha_calculos import analisar_alteracoes_ata
 
-CORES_STATUS = {
-    "Rascunho": ft.Colors.AMBER_600,
-    "Fechada": ft.Colors.GREEN_400,
-}
 DICA_DECISAO = "Comece a linha com [D] para registrar uma decisão."
 DICA_FICHA = "Linha [F] campo = valor altera a ficha (vale para a [D] logo acima)."
 DICA_PENDENCIA = "Linha [P] = assunto que ficou sem decisão (vai para Pendências)."
@@ -134,7 +132,7 @@ def build_atas_view(
             for nome in lista_participantes()
         ]
         if not participantes_chips.controls:
-            participantes_chips.controls = [ft.Text("Nenhum participante informado.", size=12, color=ft.Colors.GREY_400)]
+            participantes_chips.controls = [ft.Text("Nenhum participante informado.", size=12, color=ft.Colors.ON_SURFACE_VARIANT)]
 
     def adicionar_participantes(nomes):
         gravar_participantes(lista_participantes() + list(nomes))
@@ -169,7 +167,7 @@ def build_atas_view(
     botao_adicionar_sugerido = ft.TextButton(
         content="Adicionar escolhido", on_click=adicionar_sugerido, col=col(6, md=3)
     )
-    contador_decisoes = ft.Text("", size=12, color=ft.Colors.BLUE_200)
+    contador_decisoes = ft.Text("", size=12, color=ft.Colors.PRIMARY)
 
     def atualizar_contador(_=None):
         atualizar_resumo()
@@ -184,9 +182,9 @@ def build_atas_view(
         expand=True,
         on_change=atualizar_contador,
     )
-    mensagem_editor = ft.Text("", color=ft.Colors.RED_400, size=12)
-    aviso_ficha = ft.Text("", size=12, color=ft.Colors.AMBER_600)
-    aviso_ia = ft.Text("", size=12, color=ft.Colors.AMBER_600)  # avisos do rascunho por IA
+    mensagem_editor = ft.Text("", color=ft.Colors.ERROR, size=12)
+    aviso_ficha = ft.Text("", size=12, color=tema.aviso(page))
+    aviso_ia = ft.Text("", size=12, color=tema.aviso(page))  # avisos do rascunho por IA
     campos_ficha = []  # campos da ficha usados para reconhecer as linhas [F]
 
     def recarregar_campos_ficha():
@@ -291,7 +289,7 @@ def build_atas_view(
         min_lines=8,
         max_lines=14,
     )
-    mensagem_importar = ft.Text("", size=12, color=ft.Colors.RED_400)
+    mensagem_importar = ft.Text("", size=12, color=ft.Colors.ERROR)
     progresso_importar = ft.ProgressRing(visible=False, width=22, height=22)
     botao_gerar = ft.Button(content="Gerar rascunho", icon=ft.Icons.AUTO_AWESOME)
 
@@ -306,7 +304,7 @@ def build_atas_view(
             return
         botao_gerar.disabled = True
         progresso_importar.visible = True
-        mensagem_importar.color = ft.Colors.GREY_400
+        mensagem_importar.color = ft.Colors.ON_SURFACE_VARIANT
         mensagem_importar.value = "Gerando o rascunho... pode levar de 20 s a alguns minutos."
         page.update()
         try:
@@ -334,14 +332,14 @@ def build_atas_view(
                 abertas,
             )
         except (ia_transcricao.ErroIA, PermissionError) as erro:
-            mensagem_importar.color = ft.Colors.RED_400
+            mensagem_importar.color = ft.Colors.ERROR
             mensagem_importar.value = str(erro)
             botao_gerar.disabled = False
             progresso_importar.visible = False
             page.update()
             return
         except Exception:
-            mensagem_importar.color = ft.Colors.RED_400
+            mensagem_importar.color = ft.Colors.ERROR
             mensagem_importar.value = "Erro inesperado ao gerar o rascunho. Tente novamente."
             botao_gerar.disabled = False
             progresso_importar.visible = False
@@ -377,7 +375,7 @@ def build_atas_view(
                         "sugeridas. Nada é registrado até você revisar e fechar a ata.",
                         size=13,
                     ),
-                    ft.Text(ia_transcricao.AVISO_PRIVACIDADE, size=12, color=ft.Colors.AMBER_600),
+                    ft.Text(ia_transcricao.AVISO_PRIVACIDADE, size=12, color=tema.aviso(page)),
                     input_transcricao,
                     ft.Row([progresso_importar, mensagem_importar], wrap=True),
                 ],
@@ -393,7 +391,7 @@ def build_atas_view(
         mensagem_importar.value = ""
         mensagem_editor.value = ""
         if not ia_transcricao.ia_configurada():
-            mensagem_importar.color = ft.Colors.RED_400
+            mensagem_importar.color = ft.Colors.ERROR
             mensagem_importar.value = (
                 "A IA ainda não está configurada neste servidor (falta a variável ANTHROPIC_API_KEY)."
             )
@@ -472,7 +470,7 @@ def build_atas_view(
 
     # ---------- Confirmação de fechamento ----------
     texto_confirmacao = ft.Text("")
-    mensagem_confirmacao = ft.Text("", color=ft.Colors.RED_400, size=12)
+    mensagem_confirmacao = ft.Text("", color=ft.Colors.ERROR, size=12)
 
     def voltar_ao_editor(_):
         page.pop_dialog()
@@ -509,7 +507,7 @@ def build_atas_view(
     input_adendo = ft.TextField(
         label="Novo adendo", multiline=True, min_lines=2, hint_text="Correção ou complemento à ata"
     )
-    mensagem_adendo = ft.Text("", color=ft.Colors.RED_400, size=12)
+    mensagem_adendo = ft.Text("", color=ft.Colors.ERROR, size=12)
     modal_visualizar = ft.AlertDialog(**opcoes_dialogo(page), title=ft.Text(""))
     ata_visualizada_id = None
 
@@ -522,7 +520,7 @@ def build_atas_view(
                     ft.Container(
                         padding=6,
                         border_radius=4,
-                        bgcolor=ft.Colors.BLUE_900,
+                        bgcolor=tema.fundo_marcacao(page, "D"),
                         content=ft.Text(linha.strip(), size=14),
                     )
                 )
@@ -531,7 +529,7 @@ def build_atas_view(
                     ft.Container(
                         padding=6,
                         border_radius=4,
-                        bgcolor=ft.Colors.ORANGE_900,
+                        bgcolor=tema.fundo_marcacao(page, "P"),
                         content=ft.Text(linha.strip(), size=14),
                     )
                 )
@@ -540,7 +538,7 @@ def build_atas_view(
                     ft.Container(
                         padding=6,
                         border_radius=4,
-                        bgcolor=ft.Colors.TEAL_900,
+                        bgcolor=tema.fundo_marcacao(page, "F"),
                         content=ft.Text(linha.strip(), size=14),
                     )
                 )
@@ -549,14 +547,14 @@ def build_atas_view(
         return linhas
 
     link_pdf_ata = ft.Button(content="Baixar PDF da ata", icon=ft.Icons.DOWNLOAD, visible=False)
-    mensagem_pdf_ata = ft.Text("", size=12, color=ft.Colors.RED_400)
+    mensagem_pdf_ata = ft.Text("", size=12, color=ft.Colors.ERROR)
 
     async def gerar_pdf_ata(_):
         ata = buscar_reuniao(ata_visualizada_id)
         if ata is None:
             return
         link_pdf_ata.visible = False
-        mensagem_pdf_ata.color = ft.Colors.AMBER_600
+        mensagem_pdf_ata.color = tema.aviso(page)
         mensagem_pdf_ata.value = "Gerando o PDF..."
         page.update()
         decisoes = listar_decisoes_reuniao(ata.id)
@@ -571,12 +569,12 @@ def build_atas_view(
                 usuario.nome_completo, NOME_APP, logo_empresa(projeto.organizacao_id), logo_projeto(projeto.id),
             )
         except Exception as erro:
-            mensagem_pdf_ata.color = ft.Colors.RED_400
+            mensagem_pdf_ata.color = ft.Colors.ERROR
             mensagem_pdf_ata.value = f"Não foi possível gerar o PDF: {erro}"
             page.update()
             return
         limpar_relatorios_antigos()
-        mensagem_pdf_ata.color = ft.Colors.GREEN_400
+        mensagem_pdf_ata.color = tema.sucesso(page)
         mensagem_pdf_ata.value = "PDF pronto."
         if page.web:
             token = assinar_token(segredo_do_servidor(), {"p": relativo}, validade_s=900)
@@ -601,12 +599,12 @@ def build_atas_view(
                 f"{ata.data_reuniao.strftime('%d/%m/%Y')} | Status: {ata.status} | "
                 f"Autor: {ata.autor}",
                 size=12,
-                color=ft.Colors.GREY_400,
+                color=ft.Colors.ON_SURFACE_VARIANT,
             ),
             ft.Text(
                 f"Participantes: {ata.participantes or 'não informados'}",
                 size=12,
-                color=ft.Colors.GREY_400,
+                color=ft.Colors.ON_SURFACE_VARIANT,
             ),
             ft.Divider(),
             ft.Text("Texto da ata", weight=ft.FontWeight.BOLD),
@@ -623,7 +621,7 @@ def build_atas_view(
                             ft.Text(
                                 _codigo(dec),
                                 weight=ft.FontWeight.BOLD,
-                                color=ft.Colors.BLUE_200,
+                                color=ft.Colors.PRIMARY,
                             ),
                             ft.Text(dec.descricao, expand=True),
                         ],
@@ -631,7 +629,7 @@ def build_atas_view(
                 )
         else:
             controles.append(
-                ft.Text("Nenhuma decisão registrada nesta ata.", color=ft.Colors.GREY_400)
+                ft.Text("Nenhuma decisão registrada nesta ata.", color=ft.Colors.ON_SURFACE_VARIANT)
             )
 
         pendencias = listar_pendencias_reuniao(ata.id)
@@ -646,10 +644,10 @@ def build_atas_view(
                             ft.Text(
                                 f"P-{pendencia.numero:03d}",
                                 weight=ft.FontWeight.BOLD,
-                                color=ft.Colors.ORANGE_300,
+                                color=tema.aviso(page),
                             ),
                             ft.Text(pendencia.descricao or pendencia.titulo, expand=True),
-                            ft.Text(pendencia.status, size=12, color=ft.Colors.GREY_400),
+                            ft.Text(pendencia.status, size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                         ],
                     )
                 )
@@ -674,7 +672,7 @@ def build_atas_view(
                     ft.Text(
                         f"{_hora_local(adendo.data_registro).strftime('%d/%m/%Y %H:%M')} · {adendo.autor}",
                         size=11,
-                        color=ft.Colors.GREY_400,
+                        color=ft.Colors.ON_SURFACE_VARIANT,
                     )
                 )
                 controles.append(ft.Text(adendo.texto))
@@ -761,12 +759,12 @@ def build_atas_view(
                     "Nenhuma ata encontrada para a busca."
                     if (campo_busca.value or "").strip()
                     else "Nenhuma ata registrada neste projeto ainda.",
-                    color=ft.Colors.GREY_400,
+                    color=ft.Colors.ON_SURFACE_VARIANT,
                 )
             )
 
         for ata in atas:
-            cor_status = CORES_STATUS.get(ata.status, ft.Colors.GREY_600)
+            cor_status = tema.CORES_SITUACAO.get(ata.status, "#BDBDBD")
             qtd_decisoes = len(listar_decisoes_reuniao(ata.id))
 
             if ata.status == "Fechada":
@@ -791,10 +789,7 @@ def build_atas_view(
                                 ft.Row(
                                     wrap=True,
                                     controls=[
-                                        ft.Chip(
-                                            label=ft.Text(ata.status),
-                                            color=cor_status,
-                                        ),
+                                        tema.selo(ata.status, cor_status),
                                         ft.Text(
                                             f"Ata {ata.numero:02d} · {ata.titulo}",
                                             size=16,
@@ -815,7 +810,7 @@ def build_atas_view(
                                         ft.Text(
                                             f"Autor: {ata.autor} | Decisões: {qtd_decisoes}",
                                             size=11,
-                                            color=ft.Colors.GREY_400,
+                                            color=ft.Colors.ON_SURFACE_VARIANT,
                                         ),
                                         botao,
                                     ],
@@ -828,9 +823,9 @@ def build_atas_view(
         page.update()
 
     header = ft.Container(
-        padding=15,
-        bgcolor=ft.Colors.SURFACE,
-        border_radius=10,
+        padding=ft.Padding.symmetric(horizontal=18, vertical=14),
+        bgcolor=ft.Colors.SURFACE_CONTAINER,
+        border_radius=14,
         content=ft.ResponsiveRow(
             controls=[
                 ft.Column(
@@ -844,7 +839,7 @@ def build_atas_view(
                         ft.Text(
                             f"Projeto Ativo: {projeto.nome}" if projeto else "Sem projeto",
                             size=14,
-                            color=ft.Colors.BLUE_200,
+                            color=ft.Colors.PRIMARY,
                         ),
                     ]
                 ),
@@ -853,15 +848,12 @@ def build_atas_view(
                     wrap=True,
                     alignment=ft.MainAxisAlignment.END,
                     controls=[
-                        ft.Button(
-                            content="Linha do tempo",
-                            icon=ft.Icons.TIMELINE,
-                            on_click=on_voltar,
-                        ),
-                        ft.Button(
-                            content="+ Nova Ata",
-                            icon=ft.Icons.ADD,
-                            on_click=lambda _: abrir_editor(None),
+                        tema.botao_secundario("Linha do tempo", ft.Icons.TIMELINE, on_voltar),
+                        tema.botao_destaque(
+                            "+ Nova Ata",
+                            ft.Icons.ADD_CIRCLE_OUTLINE,
+                            lambda _: abrir_editor(None),
+                            terciario=True,
                             visible=pode_editar,
                         ),
                         ft.IconButton(
@@ -891,6 +883,7 @@ def build_atas_view(
         route="/atas",
         controls=[
             header,
+            ft.Divider(height=24, thickness=1, color=ft.Colors.OUTLINE_VARIANT),  # ações | busca
             ft.Row([campo_busca]),
             ft.Divider(),
             lista_atas,

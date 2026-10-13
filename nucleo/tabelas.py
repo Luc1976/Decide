@@ -46,6 +46,7 @@ class Usuario(SQLModel, table=True):
     organizacao_id: Optional[int] = Field(default=None, foreign_key="organizacao.id", index=True)
     # Dono da plataforma: cria e desativa organizações. NÃO dá acesso aos projetos delas.
     superadmin: bool = Field(default=False)
+    tema: Optional[str] = None  # "claro" ou "escuro" (vazio = escuro, o padrão)
 
 
 class MembroProjeto(SQLModel, table=True):

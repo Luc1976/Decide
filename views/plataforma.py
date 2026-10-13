@@ -11,6 +11,7 @@ import datetime
 
 import flet as ft
 
+import tema
 from database import criar_organizacao, definir_organizacao_ativa, listar_organizacoes_plataforma
 from layout import col, largura_dialogo, opcoes_dialogo, rotulo
 from nucleo.marcacoes import normalizar
@@ -37,15 +38,15 @@ def build_plataforma_view(page, usuario, on_logout, on_voltar):
                     padding=20,
                     content=ft.Column([
                         ft.Text("Acesso restrito", size=22, weight=ft.FontWeight.BOLD),
-                        ft.Text("Esta tela é só para o administrador da plataforma.", color=ft.Colors.GREY_400),
+                        ft.Text("Esta tela é só para o administrador da plataforma.", color=ft.Colors.ON_SURFACE_VARIANT),
                         ft.Button(content="Voltar", icon=ft.Icons.ARROW_BACK, on_click=on_voltar),
                     ]),
                 )
             ],
         )
 
-    resumo = ft.Text("", size=13, color=ft.Colors.GREY_400)
-    mensagem_lista = ft.Text("", size=12, color=ft.Colors.RED_400)
+    resumo = ft.Text("", size=13, color=ft.Colors.ON_SURFACE_VARIANT)
+    mensagem_lista = ft.Text("", size=12, color=ft.Colors.ERROR)
     campo_busca = ft.TextField(
         label="Buscar organização",
         hint_text="Nome ou identificador",
@@ -68,7 +69,7 @@ def build_plataforma_view(page, usuario, on_logout, on_voltar):
     input_admin_usuario = ft.TextField(label="Usuário (login)", hint_text="Sem espaços. Ex.: joana.beta")
     input_senha = ft.TextField(label="Senha inicial", password=True, can_reveal_password=True)
     input_senha2 = ft.TextField(label="Repita a senha", password=True, can_reveal_password=True)
-    mensagem_form = ft.Text("", size=12, color=ft.Colors.RED_400)
+    mensagem_form = ft.Text("", size=12, color=ft.Colors.ERROR)
 
     def abrir_nova(_=None):
         for campo in (input_nome, input_admin_nome, input_admin_usuario, input_senha, input_senha2):
@@ -120,7 +121,7 @@ def build_plataforma_view(page, usuario, on_logout, on_voltar):
                     ft.Text("Primeiro administrador", weight=ft.FontWeight.BOLD),
                     ft.Text(
                         "Ele cadastra a própria equipe e os clientes do escritório.",
-                        size=12, color=ft.Colors.GREY_400,
+                        size=12, color=ft.Colors.ON_SURFACE_VARIANT,
                     ),
                     input_admin_nome,
                     input_admin_usuario,
@@ -149,7 +150,7 @@ def build_plataforma_view(page, usuario, on_logout, on_voltar):
     # ---------------------------------------------------------------- suspender / reativar
     alvo = {"org": None}
     texto_suspender = ft.Text("")
-    mensagem_suspender = ft.Text("", size=12, color=ft.Colors.RED_400)
+    mensagem_suspender = ft.Text("", size=12, color=ft.Colors.ERROR)
 
     def mudar_situacao(org, ativa: bool) -> bool:
         try:
@@ -198,8 +199,8 @@ def build_plataforma_view(page, usuario, on_logout, on_voltar):
             ft.Button(
                 content="Suspender",
                 icon=ft.Icons.BLOCK,
-                bgcolor=ft.Colors.RED_700,
-                color=ft.Colors.WHITE,
+                bgcolor=ft.Colors.ERROR,
+                color=ft.Colors.ON_ERROR,
                 on_click=confirmar_suspensao,
             ),
         ],
@@ -208,21 +209,19 @@ def build_plataforma_view(page, usuario, on_logout, on_voltar):
     # ---------------------------------------------------------------- lista
     def card(resumo_org, minha: bool):
         org = resumo_org.organizacao
-        situacao = ft.Chip(
-            label=ft.Text("Ativa" if org.ativa else "Suspensa"),
-            color=ft.Colors.GREEN_700 if org.ativa else ft.Colors.RED_700,
-        )
+        texto_situacao = "Ativa" if org.ativa else "Suspensa"
+        situacao = tema.selo(texto_situacao, tema.CORES_SITUACAO[texto_situacao])
         titulo = [situacao, ft.Text(org.nome, size=16, weight=ft.FontWeight.BOLD)]
         if minha:
-            titulo.append(ft.Text("(a sua)", size=13, color=ft.Colors.BLUE_200))
+            titulo.append(ft.Text("(a sua)", size=13, color=ft.Colors.PRIMARY))
 
         if minha:
-            acao = ft.Text("A sua organização não pode ser suspensa.", size=11, color=ft.Colors.GREY_500)
+            acao = ft.Text("A sua organização não pode ser suspensa.", size=11, color=ft.Colors.ON_SURFACE_VARIANT)
         elif org.ativa:
             acao = ft.TextButton(
                 content="Suspender",
                 icon=ft.Icons.BLOCK,
-                style=ft.ButtonStyle(color=ft.Colors.RED_400),
+                style=ft.ButtonStyle(color=ft.Colors.ERROR),
                 on_click=lambda _, o=org: pedir_suspensao(o),
             )
         else:
@@ -231,8 +230,8 @@ def build_plataforma_view(page, usuario, on_logout, on_voltar):
         return ft.Container(
             padding=15,
             border_radius=10,
-            bgcolor=ft.Colors.SURFACE,
-            border=ft.Border.all(1, ft.Colors.GREEN_900 if org.ativa else ft.Colors.RED_900),
+            bgcolor=ft.Colors.SURFACE_CONTAINER,
+            border=ft.Border.all(1, ft.Colors.OUTLINE_VARIANT if org.ativa else ft.Colors.ERROR),
             content=ft.Column(
                 spacing=6,
                 controls=[
@@ -243,8 +242,8 @@ def build_plataforma_view(page, usuario, on_logout, on_voltar):
                         controls=[
                             ft.Text(_plural(resumo_org.usuarios, "usuário", "usuários"), size=13),
                             ft.Text(_plural(resumo_org.projetos, "projeto", "projetos"), size=13),
-                            ft.Text(f"Desde {_data_local(org.data_criacao)}", size=13, color=ft.Colors.GREY_400),
-                            ft.Text(f"Identificador: {org.slug}", size=12, color=ft.Colors.GREY_500),
+                            ft.Text(f"Desde {_data_local(org.data_criacao)}", size=13, color=ft.Colors.ON_SURFACE_VARIANT),
+                            ft.Text(f"Identificador: {org.slug}", size=12, color=ft.Colors.ON_SURFACE_VARIANT),
                         ],
                     ),
                     ft.Row(alignment=ft.MainAxisAlignment.END, controls=[acao]),
@@ -256,7 +255,7 @@ def build_plataforma_view(page, usuario, on_logout, on_voltar):
         try:
             todas = listar_organizacoes_plataforma(usuario.id)
         except PermissionError as erro:
-            lista.controls = [ft.Text(str(erro), color=ft.Colors.RED_400)]
+            lista.controls = [ft.Text(str(erro), color=ft.Colors.ERROR)]
             page.update()
             return
         ativas = [r for r in todas if r.organizacao.ativa]
@@ -274,20 +273,20 @@ def build_plataforma_view(page, usuario, on_logout, on_voltar):
         ]
         lista.controls = [card(r, r.organizacao.id == usuario.organizacao_id) for r in visiveis]
         if not visiveis:
-            lista.controls = [ft.Text("Nenhuma organização encontrada.", color=ft.Colors.GREY_400)]
+            lista.controls = [ft.Text("Nenhuma organização encontrada.", color=ft.Colors.ON_SURFACE_VARIANT)]
         page.update()
 
     header = ft.Container(
-        padding=15,
-        bgcolor=ft.Colors.SURFACE,
-        border_radius=10,
+        padding=ft.Padding.symmetric(horizontal=18, vertical=14),
+        bgcolor=ft.Colors.SURFACE_CONTAINER,
+        border_radius=14,
         content=ft.ResponsiveRow(
             controls=[
                 ft.Column(
                     col=col(12, md=5),
                     controls=[
                         ft.Text("Plataforma", size=22, weight=ft.FontWeight.BOLD),
-                        ft.Text("Organizações (escritórios assinantes)", size=14, color=ft.Colors.BLUE_200),
+                        ft.Text("Organizações (escritórios assinantes)", size=14, color=ft.Colors.PRIMARY),
                         resumo,
                     ],
                 ),
@@ -296,11 +295,11 @@ def build_plataforma_view(page, usuario, on_logout, on_voltar):
                     wrap=True,
                     alignment=ft.MainAxisAlignment.END,
                     controls=[
-                        ft.Button(content="Linha do tempo", icon=ft.Icons.TIMELINE, on_click=on_voltar),
-                        ft.Button(
-                            content=rotulo(page, "+ Nova Organização", "+ Organização"),
-                            icon=ft.Icons.ADD_BUSINESS,
-                            on_click=abrir_nova,
+                        tema.botao_secundario("Linha do tempo", ft.Icons.TIMELINE, on_voltar),
+                        tema.botao_destaque(
+                            rotulo(page, "+ Nova Organização", "+ Organização"),
+                            ft.Icons.ADD_BUSINESS,
+                            abrir_nova,
                         ),
                         ft.IconButton(icon=ft.Icons.LOGOUT, tooltip="Sair", on_click=on_logout),
                     ],
@@ -314,6 +313,7 @@ def build_plataforma_view(page, usuario, on_logout, on_voltar):
         route="/plataforma",
         controls=[
             header,
+            ft.Divider(height=24, thickness=1, color=ft.Colors.OUTLINE_VARIANT),  # ações | busca
             ft.ResponsiveRow([campo_busca, filtro]),
             mensagem_lista,
             ft.Divider(),

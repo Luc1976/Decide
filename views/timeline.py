@@ -11,6 +11,8 @@ from pathlib import Path
 from urllib.parse import quote
 
 import flet as ft
+
+import tema
 from database import (
     Reuniao,
     adicionar_decisao,
@@ -51,17 +53,6 @@ from models import CATEGORIAS, IMPACTOS, NIVEL_PAPEL, PAPEIS
 from seguranca import assinar_token, segredo_do_servidor
 
 PASTA_ANEXOS = "anexos_projetos"
-CORES_CATEGORIA = {
-    "Arquitetura": ft.Colors.BLUE_400,
-    "Estrutura": ft.Colors.TEAL_400,
-    "Orçamento": ft.Colors.PURPLE_400,
-    "Geral": ft.Colors.GREY_600,
-}
-CORES_IMPACTO = {
-    "Alto": ft.Colors.RED_400,
-    "Médio": ft.Colors.AMBER_600,
-    "Baixo": ft.Colors.GREEN_400,
-}
 
 
 def abrir_arquivo_nativo(caminho_arquivo):
@@ -129,7 +120,7 @@ async def ler_imagem_escolhida(page, file_picker):
 def _miniatura_logo(caminho):
     """Pré-visualização do logo na tela (ou um aviso, se ainda não houver)."""
     if caminho is None:
-        return ft.Text("Nenhum logo cadastrado.", size=12, color=ft.Colors.GREY_400, italic=True)
+        return ft.Text("Nenhum logo cadastrado.", size=12, color=ft.Colors.ON_SURFACE_VARIANT, italic=True)
     return ft.Container(
         content=ft.Image(src=caminho.read_bytes(), height=60, fit=ft.BoxFit.CONTAIN),
         bgcolor=ft.Colors.WHITE,  # como no PDF: logo sobre fundo branco
@@ -158,6 +149,7 @@ def build_timeline_view(
     on_project_deleted=None,
     on_open_pendencias=None,
     on_open_plataforma=None,
+    on_trocar_tema=None,
 ):
     # O FilePicker é um "service" e pertence à View: é passado em ft.View(services=[...])
     # no return. NÃO use page.services aqui, pois ele exige que page.views não esteja vazia.
@@ -181,9 +173,10 @@ def build_timeline_view(
     projeto_info = ft.Text(
         f"Projeto Ativo: {projeto.nome}",
         size=14,
-        color=ft.Colors.BLUE_200,
+        weight=ft.FontWeight.W_600,
+        color=ft.Colors.PRIMARY,
     )
-    acesso_info = ft.Text("", size=12, color=ft.Colors.GREY_400)
+    acesso_info = ft.Text("", size=12, color=ft.Colors.ON_SURFACE_VARIANT)
 
     def ao_selecionar_projeto(evento):
         nonlocal projeto
@@ -271,7 +264,7 @@ def build_timeline_view(
     input_edit_descricao = ft.TextField(
         label="Descrição", multiline=True, min_lines=2
     )
-    mensagem_edicao = ft.Text("", color=ft.Colors.RED_400)
+    mensagem_edicao = ft.Text("", color=ft.Colors.ERROR)
     # Logo do cliente: salvo na hora em que é enviado/removido (não depende do "Salvar").
     area_logo_cliente = ft.Container()
     mensagem_logo_cliente = ft.Text("", size=12)
@@ -283,7 +276,7 @@ def build_timeline_view(
         btn_remover_logo_cliente.visible = atual is not None
 
     async def enviar_logo_cliente(_):
-        mensagem_logo_cliente.color = ft.Colors.AMBER_600
+        mensagem_logo_cliente.color = tema.aviso(page)
         mensagem_logo_cliente.value = ""
         try:
             escolhida = await ler_imagem_escolhida(page, file_picker)
@@ -293,10 +286,10 @@ def build_timeline_view(
             page.update()
             await asyncio.to_thread(salvar_logo_projeto, projeto.id, escolhida[1], usuario)
         except (ValueError, PermissionError, OSError, TimeoutError, RuntimeError) as erro:
-            mensagem_logo_cliente.color = ft.Colors.RED_400
+            mensagem_logo_cliente.color = ft.Colors.ERROR
             mensagem_logo_cliente.value = f"Logo não salvo: {erro}"
         else:
-            mensagem_logo_cliente.color = ft.Colors.GREEN_400
+            mensagem_logo_cliente.color = tema.sucesso(page)
             mensagem_logo_cliente.value = "Logo do cliente salvo. Já vale para os próximos PDFs."
             desenhar_logo_cliente()
         page.update()
@@ -305,10 +298,10 @@ def build_timeline_view(
         try:
             remover_logo_projeto(projeto.id, usuario)
         except PermissionError as erro:
-            mensagem_logo_cliente.color = ft.Colors.RED_400
+            mensagem_logo_cliente.color = ft.Colors.ERROR
             mensagem_logo_cliente.value = str(erro)
         else:
-            mensagem_logo_cliente.color = ft.Colors.GREEN_400
+            mensagem_logo_cliente.color = tema.sucesso(page)
             mensagem_logo_cliente.value = "Logo do cliente removido."
             desenhar_logo_cliente()
         page.update()
@@ -361,7 +354,7 @@ def build_timeline_view(
                         "Aparece no canto direito do cabeçalho do relatório e das atas em PDF. "
                         "PNG ou JPG, até 5 MB (PNG com fundo transparente fica melhor).",
                         size=12,
-                        color=ft.Colors.GREY_400,
+                        color=ft.Colors.ON_SURFACE_VARIANT,
                     ),
                     area_logo_cliente,
                     ft.Row(
@@ -418,7 +411,7 @@ def build_timeline_view(
 
     async def gerar_relatorio(_):
         btn_baixar_relatorio.visible = False
-        rel_mensagem.color = ft.Colors.RED_400
+        rel_mensagem.color = ft.Colors.ERROR
         try:
             data_ini = _converter_data(rel_data_ini.value)
             data_fim = _converter_data(rel_data_fim.value)
@@ -468,7 +461,7 @@ def build_timeline_view(
             page.update()
             return
 
-        rel_mensagem.color = ft.Colors.AMBER_600
+        rel_mensagem.color = tema.aviso(page)
         rel_mensagem.value = "Gerando o relatório..."
         page.update()
 
@@ -495,13 +488,13 @@ def build_timeline_view(
                 logo_projeto(projeto.id),
             )
         except Exception as erro:
-            rel_mensagem.color = ft.Colors.RED_400
+            rel_mensagem.color = ft.Colors.ERROR
             rel_mensagem.value = f"Não foi possível gerar o relatório: {erro}"
             page.update()
             return
         limpar_relatorios_antigos()
 
-        rel_mensagem.color = ft.Colors.GREEN_400
+        rel_mensagem.color = tema.sucesso(page)
         if page.web:
             token = assinar_token(segredo_do_servidor(), {"p": relativo}, validade_s=900)
             btn_baixar_relatorio.url = f"/anexo/{quote(token)}"
@@ -524,7 +517,7 @@ def build_timeline_view(
                     ft.Text(
                         "Deixe as datas em branco para incluir todas as decisões.",
                         size=12,
-                        color=ft.Colors.GREY_400,
+                        color=ft.Colors.ON_SURFACE_VARIANT,
                     ),
                     ft.ResponsiveRow([rel_data_ini, rel_data_fim]),
                     rel_categoria,
@@ -546,7 +539,7 @@ def build_timeline_view(
     # ---------- Excluir projeto (Responsável ou administrador) ----------
     input_confirma_exclusao = ft.TextField(label="Digite o nome do projeto para confirmar")
     texto_exclusao = ft.Text("")
-    mensagem_exclusao = ft.Text("", color=ft.Colors.RED_400, size=12)
+    mensagem_exclusao = ft.Text("", color=ft.Colors.ERROR, size=12)
 
     def abrir_exclusao_projeto(_):
         if nivel < NIVEL_PAPEL["Responsável"]:
@@ -602,7 +595,7 @@ def build_timeline_view(
             ft.Button(
                 content="Excluir definitivamente",
                 icon=ft.Icons.DELETE_FOREVER,
-                color=ft.Colors.RED_400,
+                color=ft.Colors.ERROR,
                 on_click=confirmar_exclusao_projeto,
             ),
         ],
@@ -628,7 +621,7 @@ def build_timeline_view(
                 f"• {u.nome_completo} ({u.username})"
                 + (" — admin" if u.admin else "" if u.pode_criar_projetos else " — cliente"),
                 size=12,
-                color=ft.Colors.GREY_400,
+                color=ft.Colors.ON_SURFACE_VARIANT,
             )
             for u in listar_usuarios(usuario.id)
         ]
@@ -651,7 +644,7 @@ def build_timeline_view(
                 criador_id=usuario.id,  # o usuário novo entra na organização do administrador
             )
         except (ValueError, PermissionError) as erro:
-            mensagem_usuario.color = ft.Colors.RED_400
+            mensagem_usuario.color = ft.Colors.ERROR
             mensagem_usuario.value = str(erro)
             page.update()
             return
@@ -660,7 +653,7 @@ def build_timeline_view(
         input_user_senha.value = ""
         input_user_admin.value = False
         input_user_pode_criar.value = True
-        mensagem_usuario.color = ft.Colors.GREEN_400
+        mensagem_usuario.color = tema.sucesso(page)
         mensagem_usuario.value = f"Usuário '{novo.username}' cadastrado."
         atualizar_lista_usuarios()
         page.update()
@@ -717,7 +710,7 @@ def build_timeline_view(
                 try:
                     remover_membro(projeto.id, alvo, usuario.id)
                 except (ValueError, PermissionError) as erro:
-                    mensagem_membros.color = ft.Colors.RED_400
+                    mensagem_membros.color = ft.Colors.ERROR
                     mensagem_membros.value = str(erro)
                     page.update()
                     return
@@ -729,13 +722,13 @@ def build_timeline_view(
                 ft.Row(
                     controls=[
                         ft.Text(f"{u.nome_completo} ({u.username})", expand=True, size=13),
-                        ft.Text(papel, size=12, color=ft.Colors.BLUE_200),
+                        ft.Text(papel, size=12, color=ft.Colors.PRIMARY),
                         ft.IconButton(icon=ft.Icons.DELETE, tooltip="Remover acesso", on_click=remover),
                     ]
                 )
             )
         if not controles:
-            controles = [ft.Text("Nenhum membro ainda.", color=ft.Colors.GREY_400, size=12)]
+            controles = [ft.Text("Nenhum membro ainda.", color=ft.Colors.ON_SURFACE_VARIANT, size=12)]
         lista_membros.controls = controles
 
     def abrir_membros(_):
@@ -752,12 +745,12 @@ def build_timeline_view(
                 projeto.id, input_membro_login.value, input_membro_papel.value, usuario.id
             )
         except (ValueError, PermissionError) as erro:
-            mensagem_membros.color = ft.Colors.RED_400
+            mensagem_membros.color = ft.Colors.ERROR
             mensagem_membros.value = str(erro)
             page.update()
             return
         input_membro_login.value = ""
-        mensagem_membros.color = ft.Colors.GREEN_400
+        mensagem_membros.color = tema.sucesso(page)
         mensagem_membros.value = "Acesso atualizado."
         atualizar_lista_membros()
         page.update()
@@ -776,7 +769,7 @@ def build_timeline_view(
                         "Editor: também registra decisões e atas e altera a ficha.\n"
                         "Responsável: também edita o projeto e gerencia os membros.",
                         size=12,
-                        color=ft.Colors.GREY_400,
+                        color=ft.Colors.ON_SURFACE_VARIANT,
                     ),
                     ft.ResponsiveRow([input_membro_login, input_membro_papel]),
                     mensagem_membros,
@@ -808,7 +801,7 @@ def build_timeline_view(
         page.show_dialog(modal_logo_empresa)
 
     async def enviar_logo_empresa(_):
-        mensagem_logo_empresa.color = ft.Colors.AMBER_600
+        mensagem_logo_empresa.color = tema.aviso(page)
         mensagem_logo_empresa.value = ""
         try:
             escolhida = await ler_imagem_escolhida(page, file_picker)
@@ -818,10 +811,10 @@ def build_timeline_view(
             page.update()
             await asyncio.to_thread(salvar_logo_empresa, escolhida[1], usuario)
         except (ValueError, PermissionError, OSError, TimeoutError, RuntimeError) as erro:
-            mensagem_logo_empresa.color = ft.Colors.RED_400
+            mensagem_logo_empresa.color = ft.Colors.ERROR
             mensagem_logo_empresa.value = f"Logo não salvo: {erro}"
         else:
-            mensagem_logo_empresa.color = ft.Colors.GREEN_400
+            mensagem_logo_empresa.color = tema.sucesso(page)
             mensagem_logo_empresa.value = "Logo da empresa salvo. Já vale para os próximos PDFs."
             desenhar_logo_empresa()
         page.update()
@@ -830,10 +823,10 @@ def build_timeline_view(
         try:
             remover_logo_empresa(usuario)
         except PermissionError as erro:
-            mensagem_logo_empresa.color = ft.Colors.RED_400
+            mensagem_logo_empresa.color = ft.Colors.ERROR
             mensagem_logo_empresa.value = str(erro)
         else:
-            mensagem_logo_empresa.color = ft.Colors.GREEN_400
+            mensagem_logo_empresa.color = tema.sucesso(page)
             mensagem_logo_empresa.value = "Logo da empresa removido."
             desenhar_logo_empresa()
         page.update()
@@ -853,7 +846,7 @@ def build_timeline_view(
                         "em PDF, em todos os projetos. PNG ou JPG, até 5 MB (PNG com fundo "
                         "transparente fica melhor).",
                         size=12,
-                        color=ft.Colors.GREY_400,
+                        color=ft.Colors.ON_SURFACE_VARIANT,
                     ),
                     area_logo_empresa,
                     mensagem_logo_empresa,
@@ -881,18 +874,18 @@ def build_timeline_view(
 
     def salvar_senha(_):
         if input_senha_nova.value != input_senha_repetir.value:
-            mensagem_conta.color = ft.Colors.RED_400
+            mensagem_conta.color = ft.Colors.ERROR
             mensagem_conta.value = "As senhas novas não conferem."
             page.update()
             return
         try:
             alterar_propria_senha(usuario.id, input_senha_atual.value, input_senha_nova.value)
         except ValueError as erro:
-            mensagem_conta.color = ft.Colors.RED_400
+            mensagem_conta.color = ft.Colors.ERROR
             mensagem_conta.value = str(erro)
             page.update()
             return
-        mensagem_conta.color = ft.Colors.GREEN_400
+        mensagem_conta.color = tema.sucesso(page)
         mensagem_conta.value = "Senha alterada."
         for campo in (input_senha_atual, input_senha_nova, input_senha_repetir):
             campo.value = ""
@@ -928,7 +921,7 @@ def build_timeline_view(
                 )
             )
             destinos.append((arquivo, relativo))
-        status = ft.Text("Enviando arquivos...", size=12, color=ft.Colors.AMBER_600)
+        status = ft.Text("Enviando arquivos...", size=12, color=tema.aviso(page))
         lista_nomes_arquivos.controls.append(status)
         page.update()
         try:
@@ -1000,7 +993,7 @@ def build_timeline_view(
         label="Campo da ficha", options=[], col=col(12, md=8)
     )
     input_valor_ficha = ft.TextField(label="Novo valor", col=col(12, md=4))
-    mensagem_decisao = ft.Text("", color=ft.Colors.RED_400, size=12)
+    mensagem_decisao = ft.Text("", color=ft.Colors.ERROR, size=12)
 
     def carregar_opcoes_ficha():
         """Recarrega o dropdown com os campos da ficha e o valor atual de cada um."""
@@ -1176,9 +1169,7 @@ def build_timeline_view(
     )
 
     def criar_card_ata(reuniao):
-        cor_status = (
-            ft.Colors.GREEN_400 if reuniao.status == "Fechada" else ft.Colors.AMBER_600
-        )
+        cor_status = tema.CORES_SITUACAO.get(reuniao.status, "#BDBDBD")
         qtd_decisoes = len(listar_decisoes_reuniao(reuniao.id))
 
         async def abrir_ata(_, ata_id=reuniao.id):
@@ -1197,7 +1188,7 @@ def build_timeline_view(
                             weight=ft.FontWeight.BOLD,
                             text_align=ft.TextAlign.CENTER,
                         ),
-                        ft.Icon(ft.Icons.GROUPS, color=ft.Colors.ORANGE_400),
+                        ft.Icon(ft.Icons.GROUPS, color=ft.Colors.TERTIARY),
                         ft.Container(width=2, height=110, bgcolor=ft.Colors.OUTLINE),
                     ],
                 ),
@@ -1210,10 +1201,7 @@ def build_timeline_view(
                                 ft.Row(
                                     wrap=True,
                                     controls=[
-                                        ft.Chip(
-                                            label=ft.Text(reuniao.status),
-                                            color=cor_status,
-                                        ),
+                                        tema.selo(reuniao.status, cor_status),
                                         ft.Text(
                                             f"Ata {reuniao.numero:02d} · {reuniao.titulo}",
                                             size=16,
@@ -1233,7 +1221,7 @@ def build_timeline_view(
                                         ft.Text(
                                             f"Autor: {reuniao.autor} | Decisões: {qtd_decisoes}",
                                             size=11,
-                                            color=ft.Colors.GREY_400,
+                                            color=ft.Colors.ON_SURFACE_VARIANT,
                                         ),
                                         ft.Button(
                                             content="Abrir ata",
@@ -1297,7 +1285,7 @@ def build_timeline_view(
                     "Nenhuma decisão encontrada para a busca."
                     if (campo_busca.value or "").strip()
                     else "Nenhuma decisão registrada neste projeto ainda.",
-                    color=ft.Colors.GREY_400,
+                    color=ft.Colors.ON_SURFACE_VARIANT,
                 )
             )
 
@@ -1306,9 +1294,7 @@ def build_timeline_view(
                 timeline_list.controls.append(criar_card_ata(item))
                 continue
             decisao = item
-            cor_categoria = CORES_CATEGORIA.get(
-                decisao.categoria, ft.Colors.BLUE_400
-            )
+            cor_categoria = tema.cor_categoria(decisao.categoria)
             area_check = ft.Column(spacing=2)
             if decisao.checklist:
                 itens = json.loads(decisao.checklist)
@@ -1318,7 +1304,7 @@ def build_timeline_view(
                             "Checklist:",
                             size=12,
                             weight=ft.FontWeight.BOLD,
-                            color=ft.Colors.GREY_400,
+                            color=ft.Colors.ON_SURFACE_VARIANT,
                         )
                     )
                     for item in itens:
@@ -1363,13 +1349,13 @@ def build_timeline_view(
                     ft.Row(
                         spacing=6,
                         controls=[
-                            ft.Icon(ft.Icons.ASSIGNMENT, size=16, color=ft.Colors.TEAL_400),
+                            ft.Icon(ft.Icons.ASSIGNMENT, size=16, color=ft.Colors.TERTIARY),
                             ft.Text(
                                 f"Ficha · {alteracao.nome}: "
                                 f"{alteracao.valor_anterior or '(vazio)'} → "
                                 f"{alteracao.valor_novo or '(vazio)'}",
                                 size=12,
-                                color=ft.Colors.TEAL_200,
+                                color=ft.Colors.TERTIARY,
                                 expand=True,
                             ),
                         ],
@@ -1391,7 +1377,7 @@ def build_timeline_view(
                                 ),
                                 ft.Icon(
                                     ft.Icons.RADIO_BUTTON_CHECKED,
-                                    color=cor_categoria,
+                                    color=tema.cor_categoria_forte(decisao.categoria),
                                 ),
                                 ft.Container(
                                     width=2,
@@ -1409,10 +1395,7 @@ def build_timeline_view(
                                         ft.Row(
                                             wrap=True,
                                             controls=[
-                                                ft.Chip(
-                                                    label=ft.Text(decisao.categoria),
-                                                    color=cor_categoria,
-                                                ),
+                                                tema.selo(decisao.categoria, cor_categoria),
                                                 ft.Text(
                                                     (f"D-{decisao.numero:03d} · " if decisao.numero else "")
                                                     + decisao.titulo,
@@ -1426,7 +1409,7 @@ def build_timeline_view(
                                             f"Justificativa: {decisao.justificativa}",
                                             size=13,
                                             italic=True,
-                                            color=ft.Colors.WHITE_70,
+                                            color=ft.Colors.ON_SURFACE_VARIANT,
                                         ),
                                         area_check,
                                         area_anexos,
@@ -1436,7 +1419,7 @@ def build_timeline_view(
                                         ft.Text(
                                             f"Autor: {decisao.autor} | Impacto: {decisao.impacto}",
                                             size=11,
-                                            color=ft.Colors.GREY_400,
+                                            color=ft.Colors.ON_SURFACE_VARIANT,
                                         ),
                                     ]
                                 ),
@@ -1459,10 +1442,8 @@ def build_timeline_view(
         if on_open_pendencias:
             await on_open_pendencias()
 
-    btn_pendencias = ft.Button(
-        content=rotulo(page, "Pendências", "Pend."),
-        icon=ft.Icons.PENDING_ACTIONS,
-        on_click=abrir_pendencias,
+    btn_pendencias = tema.botao_secundario(
+        rotulo(page, "Pendências", "Pend."), ft.Icons.PENDING_ACTIONS, abrir_pendencias
     )
 
     def atualizar_botao_pendencias():
@@ -1470,30 +1451,37 @@ def build_timeline_view(
         abertas = contar_pendencias_abertas(projeto.id)
         btn_pendencias.content = rotulo(page, "Pendências", "Pend.") + (f" ({abertas})" if abertas else "")
 
-    btn_novo_projeto = ft.Button(
-        content=rotulo(page, "+ Novo Projeto", "+ Projeto"),
-        icon=ft.Icons.ADD,
+    # Gestão do projeto: discretas (texto com ícone, sem fundo).
+    btn_novo_projeto = ft.TextButton(
+        content=rotulo(page, "Novo Projeto", "Novo"),
+        icon=ft.Icons.CREATE_NEW_FOLDER_OUTLINED,
         on_click=lambda _: page.show_dialog(modal_projeto),
     )
-    btn_editar_projeto = ft.Button(
-        content=rotulo(page, "Editar Projeto", "Editar"), icon=ft.Icons.EDIT, on_click=abrir_edicao_projeto
+    btn_editar_projeto = ft.TextButton(
+        content=rotulo(page, "Editar Projeto", "Editar"), icon=ft.Icons.EDIT_OUTLINED, on_click=abrir_edicao_projeto
     )
-    btn_excluir_projeto = ft.Button(
+    btn_excluir_projeto = ft.TextButton(
         content=rotulo(page, "Excluir Projeto", "Excluir"),
-        icon=ft.Icons.DELETE,
-        color=ft.Colors.RED_400,
+        icon=ft.Icons.DELETE_OUTLINE,
+        style=ft.ButtonStyle(color=ft.Colors.ERROR, icon_color=ft.Colors.ERROR),
         on_click=abrir_exclusao_projeto,
     )
-    btn_membros = ft.Button(
-        content="Membros", icon=ft.Icons.PEOPLE, on_click=abrir_membros
+    btn_membros = ft.TextButton(
+        content="Membros", icon=ft.Icons.PEOPLE_OUTLINE, on_click=abrir_membros
     )
-    btn_relatorio = ft.Button(
-        content=rotulo(page, "Relatório PDF", "PDF"),
-        icon=ft.Icons.PICTURE_AS_PDF,
-        on_click=abrir_relatorio,
+    # Ações frequentes: fundo suave.
+    btn_relatorio = tema.botao_secundario(
+        rotulo(page, "Relatório PDF", "PDF"), ft.Icons.PICTURE_AS_PDF, abrir_relatorio
     )
-    btn_nova_decisao = ft.Button(
-        content=rotulo(page, "+ Nova Decisão", "+ Decisão"), icon=ft.Icons.ADD, on_click=abrir_modal_decisao
+    btn_ficha = tema.botao_secundario(
+        rotulo(page, "Ficha do Empreendimento", "Ficha"), ft.Icons.ASSIGNMENT, abrir_ficha_empreendimento
+    )
+    # Ações principais: fundo colorido (azul e verde-azulado).
+    btn_nova_decisao = tema.botao_destaque(
+        rotulo(page, "+ Nova Decisão", "+ Decisão"), ft.Icons.ADD_CIRCLE_OUTLINE, abrir_modal_decisao
+    )
+    btn_atas = tema.botao_destaque(
+        rotulo(page, "Atas de Reunião", "Atas"), ft.Icons.GROUPS, abrir_lista_atas, terciario=True
     )
 
     def aplicar_permissoes():
@@ -1515,83 +1503,93 @@ def build_timeline_view(
 
     aplicar_permissoes()
 
+    def _icone(icone, dica, ao_clicar):
+        return ft.IconButton(icon=icone, tooltip=dica, on_click=ao_clicar, icon_color=ft.Colors.ON_SURFACE_VARIANT)
+
+    claro = tema.eh_claro(page)
+    icones_conta = [
+        *(
+            [
+                _icone(ft.Icons.DOMAIN, "Plataforma: organizações (escritórios assinantes)", on_open_plataforma),
+            ]
+            if getattr(usuario, "superadmin", False) and on_open_plataforma
+            else []
+        ),
+        *(
+            [
+                _icone(ft.Icons.GROUP_ADD_OUTLINED, "Usuários da organização", abrir_usuarios),
+                _icone(ft.Icons.BUSINESS, "Logo da empresa (cabeçalho dos PDFs)", abrir_logo_empresa),
+            ]
+            if usuario.admin
+            else []
+        ),
+        *(
+            [
+                _icone(
+                    ft.Icons.DARK_MODE_OUTLINED if claro else ft.Icons.LIGHT_MODE_OUTLINED,
+                    "Mudar para o modo escuro" if claro else "Mudar para o modo claro",
+                    lambda _: on_trocar_tema(),
+                )
+            ]
+            if on_trocar_tema
+            else []
+        ),
+        _icone(ft.Icons.MANAGE_ACCOUNTS, "Minha conta (trocar senha)", abrir_conta),
+        _icone(ft.Icons.LOGOUT, "Sair", on_logout),
+    ]
+
     header = ft.Container(
-        padding=15,
-        bgcolor=ft.Colors.SURFACE,
-        border_radius=10,
-        content=ft.ResponsiveRow(
+        padding=ft.Padding.symmetric(horizontal=18, vertical=14),
+        bgcolor=ft.Colors.SURFACE_CONTAINER,
+        border_radius=14,
+        content=ft.Column(
+            spacing=14,
             controls=[
-                ft.Column(
-                    [
-                        ft.Text(
-                            "Memória de Projetos",
-                            size=22,
-                            weight=ft.FontWeight.BOLD,
-                        ),
-                        projeto_info,
-                        acesso_info,
-                    ],
-                    col=col(12, md=4),
-                ),
-                ft.Row(
-                    col=col(12, md=8),
-                    wrap=True,
-                    alignment=ft.MainAxisAlignment.END,
+                # Linha 1: identificação do projeto e ícones da conta
+                ft.ResponsiveRow(
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
                     controls=[
-                        btn_novo_projeto,
-                        btn_editar_projeto,
-                        btn_membros,
-                        btn_excluir_projeto,
-                        ft.Button(
-                            content=rotulo(page, "Ficha do Empreendimento", "Ficha"),
-                            icon=ft.Icons.ASSIGNMENT,
-                            on_click=abrir_ficha_empreendimento,
-                        ),
-                        ft.Button(
-                            content=rotulo(page, "Atas de Reunião", "Atas"),
-                            icon=ft.Icons.GROUPS,
-                            on_click=abrir_lista_atas,
-                        ),
-                        btn_pendencias,
-                        btn_nova_decisao,
-                        btn_relatorio,
-                        *(
-                            [
-                                ft.Button(
-                                    content="Usuários",
-                                    icon=ft.Icons.GROUP_ADD,
-                                    on_click=abrir_usuarios,
+                        ft.Row(
+                            col=col(12, md=7),
+                            spacing=12,
+                            controls=[
+                                ft.Icon(ft.Icons.TIMELINE, size=34, color=ft.Colors.PRIMARY),
+                                ft.Column(
+                                    spacing=2,
+                                    controls=[
+                                        ft.Text("Memória de Projetos", size=22, weight=ft.FontWeight.BOLD),
+                                        projeto_info,
+                                        acesso_info,
+                                    ],
                                 ),
-                                ft.IconButton(
-                                    icon=ft.Icons.BUSINESS,
-                                    tooltip="Logo da empresa (cabeçalho dos PDFs)",
-                                    on_click=abrir_logo_empresa,
-                                ),
-                            ]
-                            if usuario.admin
-                            else []
+                            ],
                         ),
-                        *(
-                            [
-                                ft.Button(
-                                    content="Plataforma",
-                                    icon=ft.Icons.DOMAIN,
-                                    tooltip="Organizações (escritórios assinantes)",
-                                    on_click=on_open_plataforma,
-                                )
-                            ]
-                            if getattr(usuario, "superadmin", False) and on_open_plataforma
-                            else []
+                        ft.Row(
+                            col=col(12, md=5),
+                            wrap=True,
+                            spacing=0,
+                            alignment=ft.MainAxisAlignment.END,
+                            controls=icones_conta,
                         ),
-                        ft.IconButton(
-                            icon=ft.Icons.MANAGE_ACCOUNTS,
-                            tooltip="Minha conta (trocar senha)",
-                            on_click=abrir_conta,
+                    ],
+                ),
+                # Linha 2: ações (principais em destaque) e gestão do projeto
+                ft.ResponsiveRow(
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    controls=[
+                        ft.Row(
+                            col=col(12, lg=8),
+                            wrap=True,
+                            spacing=8,
+                            run_spacing=8,
+                            controls=[btn_nova_decisao, btn_atas, btn_pendencias, btn_ficha, btn_relatorio],
                         ),
-                        ft.IconButton(
-                            icon=ft.Icons.LOGOUT,
-                            tooltip="Sair",
-                            on_click=on_logout,
+                        ft.Row(
+                            col=col(12, lg=4),
+                            wrap=True,
+                            spacing=0,
+                            alignment=ft.MainAxisAlignment.END,
+                            controls=[btn_novo_projeto, btn_editar_projeto, btn_membros, btn_excluir_projeto],
                         ),
                     ],
                 ),
@@ -1604,6 +1602,7 @@ def build_timeline_view(
         route="/timeline",
         controls=[
             header,
+            ft.Divider(height=24, thickness=1, color=ft.Colors.OUTLINE_VARIANT),  # ações | busca
             ft.ResponsiveRow([seletor_projeto, campo_busca]),
             ft.Divider(),
             timeline_list,

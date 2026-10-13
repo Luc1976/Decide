@@ -1,5 +1,5 @@
 import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -19,6 +19,7 @@ class UsuarioSaida(Saida):
     pode_criar_projetos: bool
     organizacao_id: Optional[int] = None
     superadmin: bool = False
+    tema: Optional[str] = None
 
 
 class TokenSaida(BaseModel):
@@ -39,3 +40,7 @@ class NovoUsuarioEntrada(BaseModel):
     nome_completo: str = Field(min_length=1, max_length=200)
     admin: bool = False
     pode_criar_projetos: bool = True
+
+
+class TemaEntrada(BaseModel):
+    tema: Literal["claro", "escuro"]

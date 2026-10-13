@@ -150,3 +150,17 @@ def test_linha_de_comando_com_organizacao(c, duas_orgs):
     with pytest.raises(ValueError, match="não encontrada"):
         db.criar_usuario("hugo", "senha123", "Hugo", organizacao_slug="nao-existe")
     assert {o.slug for o in db.listar_organizacoes()} == {"organizacao-principal", "escritorio-beta"}
+
+
+def test_preferencia_de_tema(c, duas_orgs):
+    h = duas_orgs
+    assert c.get(f"{V}/auth/eu", headers=h["beto"]).json()["tema"] is None
+    r = c.put(f"{V}/auth/tema", json={"tema": "claro"}, headers=h["beto"])
+    assert r.status_code == 200 and r.json()["tema"] == "claro"
+    assert c.put(f"{V}/auth/tema", json={"tema": "rosa"}, headers=h["beto"]).status_code == 422
+    from nucleo.db import nova_sessao as nova_sessao_
+    with nova_sessao_() as s:
+        from nucleo.servicos.usuarios import buscar_por_username
+        assert buscar_por_username(s, "beto").tema == "claro"
+    db.definir_tema(db.autenticar_usuario("ana", "senha123").id, "escuro")
+    assert db.autenticar_usuario("ana", "senha123").tema == "escuro"

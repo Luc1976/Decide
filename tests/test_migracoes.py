@@ -63,10 +63,10 @@ def _povoar_producao(eng) -> None:
 def test_banco_novo_bate_com_o_modelo(tmp_path):
     eng = _banco(tmp_path)
     atualizar_banco(eng)
-    assert revisao_atual(eng) == "0002"
+    assert revisao_atual(eng) == "0003"
     assert _diferencas(eng) == []
     atualizar_banco(eng)  # de novo: não faz nada nem quebra
-    assert revisao_atual(eng) == "0002"
+    assert revisao_atual(eng) == "0003"
 
 
 def test_banco_novo_nao_cria_organizacao_vazia(tmp_path):
@@ -86,7 +86,7 @@ def test_banco_de_producao_migra_sem_perder_nada(tmp_path, monkeypatch):
 
     atualizar_banco(eng)
 
-    assert revisao_atual(eng) == "0002"
+    assert revisao_atual(eng) == "0003"
     assert _diferencas(eng) == []
     with Session(eng) as s:
         orgs = s.exec(select(Organizacao)).all()
@@ -114,7 +114,7 @@ def test_volta_e_reaplica_a_0002(tmp_path):
     with eng.connect() as c:
         assert c.execute(text("SELECT count(*) FROM usuario")).scalar() == 4  # dados ficaram
     atualizar_banco(eng)
-    assert revisao_atual(eng) == "0002" and _diferencas(eng) == []
+    assert revisao_atual(eng) == "0003" and _diferencas(eng) == []
 
 
 # ---------------------------------------------------------------- banco muito antigo
@@ -146,7 +146,7 @@ def test_app_completo_sobre_banco_migrado(tmp_path, monkeypatch):
         assert c.execute(text("SELECT count(*) FROM projeto")).scalar() == 2  # nem projeto exemplo
 
 
-@pytest.mark.parametrize("arquivo", ["0001_esquema_base.py", "0002_organizacoes.py"])
+@pytest.mark.parametrize("arquivo", ["0001_esquema_base.py", "0002_organizacoes.py", "0003_tema_do_usuario.py"])
 def test_migracoes_tem_docstring_e_downgrade(arquivo):
     texto = (Path(__file__).parent.parent / "migracoes" / "versions" / arquivo).read_text()
     assert texto.startswith('"""') and "def downgrade" in texto

@@ -3,7 +3,9 @@ import math
 
 import flet as ft
 
-from database import autenticar_usuario, init_db, listar_projetos_do_usuario, pode_no_projeto
+import tema
+
+from database import autenticar_usuario, definir_tema, init_db, listar_projetos_do_usuario, pode_no_projeto
 from views.atas import build_atas_view
 from views.ficha import build_ficha_view
 from views.login import build_login_view
@@ -19,7 +21,7 @@ LIMITADOR_LOGIN = LimitadorTentativas(maximo=5, janela_s=900, bloqueio_s=900)
 
 def main(page: ft.Page):
     page.title = "Ru.A Estudio - Memória de Projetos"
-    page.theme_mode = ft.ThemeMode.DARK
+    tema.configurar(page)  # temas claro e escuro; começa no escuro até o login
     page.padding = 20
 
     init_db()
@@ -48,8 +50,21 @@ def main(page: ft.Page):
                 projeto_excluido,
                 abrir_pendencias,
                 abrir_plataforma,
+                trocar_tema,
             )
         )
+
+    def trocar_tema():
+        """Alterna claro/escuro, guarda a escolha do usuário e redesenha a tela atual."""
+        novo = tema.oposto(tema.modo_atual(page))
+        tema.aplicar_modo(page, novo)
+        if usuario_logado is not None:
+            usuario_logado.tema = novo
+            try:
+                definir_tema(usuario_logado.id, novo)
+            except Exception as erro:  # a preferência é conveniência: nunca derruba a tela
+                print(f"[memoria] Não foi possível guardar o tema: {erro}", flush=True)
+        route_change(None)
 
     def montar_plataforma():
         mostrar_view(build_plataforma_view(page, usuario_logado, sair, voltar_timeline))
@@ -105,6 +120,7 @@ def main(page: ft.Page):
         if usuario:
             LIMITADOR_LOGIN.sucesso(chave)
             usuario_logado = usuario
+            tema.aplicar_modo(page, usuario.tema)  # modo escolhido por ele (padrão: escuro)
             projetos = listar_projetos_do_usuario(usuario.id)
             projeto_ativo = projetos[0] if projetos else None
             await page.push_route("/timeline")

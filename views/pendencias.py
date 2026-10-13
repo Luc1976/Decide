@@ -1,6 +1,8 @@
 import datetime
 
 import flet as ft
+
+import tema
 from database import (
     PENDENCIA_ABERTA,
     PENDENCIA_CANCELADA,
@@ -18,11 +20,6 @@ from database import (
 from layout import col, largura_dialogo, opcoes_dialogo, rotulo
 from models import CATEGORIAS, IMPACTOS, NIVEL_PAPEL
 
-CORES_STATUS = {
-    PENDENCIA_ABERTA: ft.Colors.ORANGE_400,
-    PENDENCIA_RESOLVIDA: ft.Colors.GREEN_400,
-    PENDENCIA_CANCELADA: ft.Colors.GREY_600,
-}
 TODAS = "__todas__"
 NOVA = "nova"
 EXISTENTE = "existente"
@@ -73,7 +70,7 @@ def build_pendencias_view(page, projeto, usuario, on_logout, on_voltar, on_open_
         ],
         on_select=lambda _: carregar(),
     )
-    resumo = ft.Text("", size=13, color=ft.Colors.GREY_400)
+    resumo = ft.Text("", size=13, color=ft.Colors.ON_SURFACE_VARIANT)
     lista = ft.ListView(expand=True, spacing=15, padding=10)
 
     # ---------- Nova / editar pendência ----------
@@ -89,7 +86,7 @@ def build_pendencias_view(page, projeto, usuario, on_logout, on_voltar, on_open_
     )
     input_responsavel = ft.TextField(label="Quem deve decidir / responder", col=col(12, md=6))
     input_prazo = ft.TextField(label="Prazo (dd/mm/aaaa, opcional)", col=col(12, md=6))
-    mensagem_form = ft.Text("", color=ft.Colors.RED_400, size=12)
+    mensagem_form = ft.Text("", color=ft.Colors.ERROR, size=12)
 
     def abrir_formulario(pendencia=None):
         nonlocal pendencia_atual
@@ -190,7 +187,7 @@ def build_pendencias_view(page, projeto, usuario, on_logout, on_voltar, on_open_
     res_decisao = ft.Dropdown(label="Decisão que resolve a pendência", options=[])
     caixa_existente = ft.Column(tight=True, controls=[res_decisao], visible=False)
     res_observacao = ft.TextField(label="Observação (opcional)", multiline=True, min_lines=1)
-    mensagem_resolver = ft.Text("", color=ft.Colors.RED_400, size=12)
+    mensagem_resolver = ft.Text("", color=ft.Colors.ERROR, size=12)
 
     def trocar_modo(_=None):
         caixa_nova.visible = modo_resolucao.value == NOVA
@@ -283,7 +280,7 @@ def build_pendencias_view(page, projeto, usuario, on_logout, on_voltar, on_open_
 
     # ---------- Cancelar (o assunto deixou de precisar de decisão) ----------
     input_motivo = ft.TextField(label="Motivo do cancelamento", multiline=True, min_lines=2)
-    mensagem_cancelar = ft.Text("", color=ft.Colors.RED_400, size=12)
+    mensagem_cancelar = ft.Text("", color=ft.Colors.ERROR, size=12)
 
     def abrir_cancelar(pendencia):
         nonlocal pendencia_atual
@@ -317,7 +314,7 @@ def build_pendencias_view(page, projeto, usuario, on_logout, on_voltar, on_open_
                         "Use quando o assunto deixou de precisar de decisão. Ele continua no "
                         "histórico (filtro Canceladas) e pode ser reaberto.",
                         size=12,
-                        color=ft.Colors.GREY_400,
+                        color=ft.Colors.ON_SURFACE_VARIANT,
                     ),
                     input_motivo,
                     mensagem_cancelar,
@@ -341,7 +338,7 @@ def build_pendencias_view(page, projeto, usuario, on_logout, on_voltar, on_open_
 
     # ---------- Lista ----------
     def card(pendencia, atas, decisoes, hoje):
-        cor = CORES_STATUS.get(pendencia.status, ft.Colors.GREY_600)
+        cor = tema.CORES_SITUACAO.get(pendencia.status, "#BDBDBD")
         detalhes = [f"Categoria: {pendencia.categoria}"]
         if pendencia.responsavel:
             detalhes.append(f"Responsável: {pendencia.responsavel}")
@@ -352,7 +349,7 @@ def build_pendencias_view(page, projeto, usuario, on_logout, on_voltar, on_open_
             ft.Row(
                 wrap=True,
                 controls=[
-                    ft.Chip(label=ft.Text(pendencia.status), color=cor),
+                    tema.selo(pendencia.status, cor),
                     ft.Text(
                         f"{_codigo(pendencia)} · {pendencia.titulo}",
                         size=16,
@@ -369,7 +366,7 @@ def build_pendencias_view(page, projeto, usuario, on_logout, on_voltar, on_open_
                 ft.Text(
                     f"Prazo: {pendencia.prazo:%d/%m/%Y}" + (" (atrasada)" if atrasada else ""),
                     size=13,
-                    color=ft.Colors.RED_400 if atrasada else None,
+                    color=ft.Colors.ERROR if atrasada else None,
                     weight=ft.FontWeight.BOLD if atrasada else None,
                 )
             )
@@ -381,7 +378,7 @@ def build_pendencias_view(page, projeto, usuario, on_logout, on_voltar, on_open_
             texto_origem = f"Levantada na Ata {origem[0]:02d} - {origem[1]} ({quando})"
         else:
             texto_origem = f"Registrada por {pendencia.autor or '-'} em {quando}"
-        linha_origem = [ft.Text(texto_origem, size=11, color=ft.Colors.GREY_400)]
+        linha_origem = [ft.Text(texto_origem, size=11, color=ft.Colors.ON_SURFACE_VARIANT)]
         if origem and on_open_ata:
             async def abrir_ata(_, ata_id=pendencia.reuniao_id):
                 await on_open_ata(ata_id)
@@ -406,7 +403,7 @@ def build_pendencias_view(page, projeto, usuario, on_logout, on_voltar, on_open_
                 texto = f"Cancelada por {pendencia.resolvida_por} em {data}"
             controles.append(ft.Text(texto, size=13, color=cor))
             if pendencia.resolucao:
-                controles.append(ft.Text(pendencia.resolucao, size=12, color=ft.Colors.GREY_400, italic=True))
+                controles.append(ft.Text(pendencia.resolucao, size=12, color=ft.Colors.ON_SURFACE_VARIANT, italic=True))
 
         if pode_editar:
             if pendencia.status == PENDENCIA_ABERTA:
@@ -457,22 +454,22 @@ def build_pendencias_view(page, projeto, usuario, on_logout, on_voltar, on_open_
                 )
             else:
                 vazio = "Nenhuma pendência nesta situação."
-            lista.controls.append(ft.Text(vazio, color=ft.Colors.GREY_400))
+            lista.controls.append(ft.Text(vazio, color=ft.Colors.ON_SURFACE_VARIANT))
         for pendencia in pendencias:
             lista.controls.append(card(pendencia, atas, decisoes, hoje))
         page.update()
 
     header = ft.Container(
-        padding=15,
-        bgcolor=ft.Colors.SURFACE,
-        border_radius=10,
+        padding=ft.Padding.symmetric(horizontal=18, vertical=14),
+        bgcolor=ft.Colors.SURFACE_CONTAINER,
+        border_radius=14,
         content=ft.ResponsiveRow(
             controls=[
                 ft.Column(
                     col=col(12, md=5),
                     controls=[
                         ft.Text("Pendências de Decisão", size=22, weight=ft.FontWeight.BOLD),
-                        ft.Text(f"Projeto Ativo: {projeto.nome}", size=14, color=ft.Colors.BLUE_200),
+                        ft.Text(f"Projeto Ativo: {projeto.nome}", size=14, color=ft.Colors.PRIMARY),
                         resumo,
                     ],
                 ),
@@ -481,11 +478,11 @@ def build_pendencias_view(page, projeto, usuario, on_logout, on_voltar, on_open_
                     wrap=True,
                     alignment=ft.MainAxisAlignment.END,
                     controls=[
-                        ft.Button(content="Linha do tempo", icon=ft.Icons.TIMELINE, on_click=on_voltar),
-                        ft.Button(
-                            content=rotulo(page, "+ Nova Pendência", "+ Pendência"),
-                            icon=ft.Icons.ADD,
-                            on_click=lambda _: abrir_formulario(None),
+                        tema.botao_secundario("Linha do tempo", ft.Icons.TIMELINE, on_voltar),
+                        tema.botao_destaque(
+                            rotulo(page, "+ Nova Pendência", "+ Pendência"),
+                            ft.Icons.ADD_CIRCLE_OUTLINE,
+                            lambda _: abrir_formulario(None),
                             visible=pode_editar,
                         ),
                         ft.IconButton(icon=ft.Icons.LOGOUT, tooltip="Sair", on_click=on_logout),
@@ -500,6 +497,7 @@ def build_pendencias_view(page, projeto, usuario, on_logout, on_voltar, on_open_
         route="/pendencias",
         controls=[
             header,
+            ft.Divider(height=24, thickness=1, color=ft.Colors.OUTLINE_VARIANT),  # ações | busca
             ft.ResponsiveRow([campo_busca, filtro_status]),
             ft.Divider(),
             lista,

@@ -138,3 +138,20 @@ def redefinir_senha(s: Session, username: str, nova_senha: str) -> None:
     usuario.senha = hash_senha(nova_senha)
     s.add(usuario)
     s.commit()
+
+
+TEMAS = ("claro", "escuro")
+
+
+def definir_tema(s: Session, ator: Ator, tema: str) -> Usuario:
+    """Preferência de aparência do próprio usuário (vale em qualquer aparelho)."""
+    if tema not in TEMAS:
+        raise ValueError("Escolha o modo claro ou escuro.")
+    usuario = s.get(Usuario, ator.id) if ator.id is not None else None
+    if usuario is None:
+        raise NaoEncontrado("Usuário não encontrado.")
+    usuario.tema = tema
+    s.add(usuario)
+    s.commit()
+    s.refresh(usuario)
+    return usuario
