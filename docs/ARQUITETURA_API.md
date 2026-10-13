@@ -33,7 +33,7 @@ O app Flet continua funcionando como antes. Por baixo dele foram criadas duas ca
   e auditoria ficam dentro dela, e nada atravessa essa fronteira (seção 4).
 - **`migracoes/`**: o Alembic controla o esquema do banco, no SQLite e no PostgreSQL
   (seção 6).
-- **`tests/`**: 61 testes automáticos (ver seção 9).
+- **`tests/`**: 72 testes automáticos (ver seção 9).
 
 ## 2. Diagnóstico do código atual
 
@@ -282,6 +282,8 @@ réplicas.
 | `tests/test_servicos.py` (12) | Regras novas: leitura exige acesso, Leitor não vê rascunho, objeto de outro projeto dá 404, anexo só do próprio projeto, conflitos de estado, auditoria, IA com contexto do projeto |
 | `tests/test_api.py` (13) | Pela HTTP, como o frontend usará: login e bloqueio, isolamento, fluxo ata → decisões → ficha → pendência, anexo com download, PDFs, exclusão |
 | `tests/test_organizacoes.py` (9) | Projetos, membros, usuários, auditoria e logos não atravessam organizações; plataforma só para superadmin; suspensão bloqueia login e tokens; telas Flet e linha de comando criam usuário na organização certa |
+| `tests/test_tela_plataforma.py` (7) | Tela da plataforma dirigida como o usuário: criar organização, erros no formulário, suspender e reativar, busca, acesso restrito e rótulo de celular |
+| `tests/test_conexao_banco.py` (4) | Espera pelo banco na partida e diagnóstico sem expor a senha |
 | `tests/test_migracoes.py` (8) | Banco novo, **cópia do esquema de produção com dados** e banco muito antigo: todos migram, ficam idênticos ao modelo e ninguém perde acesso; volta e reaplicação da 0002; `init_db` não recria admin nem projeto exemplo |
 
 ## 10. Próximos passos (em ordem)
@@ -301,6 +303,6 @@ réplicas.
    integração de pagamento e suspensão automática por inadimplência (a suspensão já existe).
 6. **Login gerenciado** (Clerk, Auth0 ou Keycloak), para ter MFA, recuperação de senha por
    e-mail e convite de cliente por link.
-7. **Frontend.** Next.js/React como PWA, consumindo a API, uma tela por vez. Incluir um painel
-   da plataforma para o superadmin.
+7. **Frontend.** Next.js/React como PWA, consumindo a API, uma tela por vez. O painel da
+   plataforma já existe no app Flet (`views/plataforma.py`) e serve de referência.
 8. **Desligar o Flet** e apagar `database.py` e `views/`.

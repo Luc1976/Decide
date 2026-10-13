@@ -38,8 +38,18 @@ Ninguém perde acesso, mas faça assim:
    Nas partidas seguintes essa linha não aparece (não há nada a aplicar). Para conferir:
    `alembic current` no terminal do serviço (deve mostrar `0002 (head)`).
 
-O administrador mais antigo (o usuário inicial) vira também **superadmin**: pode criar outras
-organizações (escritórios clientes do Decidiu) pela API, em `/api/docs`.
+O administrador mais antigo (o usuário inicial) vira também **superadmin**.
+
+## Plataforma: organizações (só o superadmin)
+Botão **Plataforma** no cabeçalho da linha do tempo (só aparece para o superadmin).
+- **+ Nova Organização**: nome do escritório e o primeiro administrador (nome, usuário e senha
+  inicial). Envie ao administrador o endereço, o usuário e, por outro canal, a senha; ele troca a
+  senha em "Minha conta" e cadastra a equipe em "Usuários".
+- A lista mostra a situação, quantos usuários e projetos cada organização tem e desde quando.
+  Só contagens: os projetos dos escritórios continuam invisíveis para a plataforma.
+- **Suspender**: ninguém da organização entra (quem estiver com o app aberto perde o acesso na
+  hora). Os dados ficam guardados. **Reativar** devolve o acesso. A sua organização não pode ser
+  suspensa.
 
 ## Como funciona
 - O Python roda no servidor e o navegador é só a tela (Flet em modo web). Todos

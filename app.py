@@ -8,6 +8,7 @@ from views.atas import build_atas_view
 from views.ficha import build_ficha_view
 from views.login import build_login_view
 from views.pendencias import build_pendencias_view
+from views.plataforma import build_plataforma_view
 from views.sem_projeto import build_sem_projeto_view
 from views.timeline import build_timeline_view
 from seguranca import LimitadorTentativas
@@ -46,8 +47,12 @@ def main(page: ft.Page):
                 abrir_ficha,
                 projeto_excluido,
                 abrir_pendencias,
+                abrir_plataforma,
             )
         )
+
+    def montar_plataforma():
+        mostrar_view(build_plataforma_view(page, usuario_logado, sair, voltar_timeline))
 
     def montar_pendencias():
         mostrar_view(
@@ -138,6 +143,9 @@ def main(page: ft.Page):
     async def abrir_pendencias(_=None):
         await page.push_route("/pendencias")
 
+    async def abrir_plataforma(_=None):
+        await page.push_route("/plataforma")
+
     async def voltar_timeline(_=None):
         await page.push_route("/timeline")
 
@@ -169,6 +177,8 @@ def main(page: ft.Page):
                 asyncio.create_task(page.push_route("/login"))
                 return
             mostrar_view(build_login_view(fazer_login, page))
+        elif page.route == "/plataforma":
+            montar_plataforma()  # não depende de projeto; a própria tela confere o superadmin
         elif not garantir_projeto_valido():
             mostrar_view(
                 build_sem_projeto_view(page, usuario_logado, sair, projeto_criado)

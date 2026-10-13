@@ -22,6 +22,7 @@ from nucleo.permissoes import nivel as _nivel_sessao
 from nucleo.senhas import hash_senha, senha_confere as _senha_confere  # noqa: F401
 from nucleo.servicos import atas as s_atas
 from nucleo.servicos import decisoes as s_decisoes
+from nucleo.servicos import organizacoes as s_organizacoes
 from nucleo.servicos import ficha as s_ficha
 from nucleo.servicos import pendencias as s_pendencias
 from nucleo.servicos import projetos as s_projetos
@@ -186,6 +187,27 @@ def criar_usuario(username: str, senha: str, nome_completo: str, admin: bool = F
             org_id = org.id
         return s_usuarios.criar(s, username, senha, nome_completo, admin, pode_criar_projetos,
                                 ator=ator, organizacao_id=org_id)
+
+
+# ---------------------------------------------------------------- plataforma (superadmin)
+
+def listar_organizacoes_plataforma(solicitante_id: int) -> list:
+    """[ResumoOrganizacao(organizacao, usuarios, projetos)]. Só para o superadmin."""
+    with nova_sessao() as s:
+        return s_organizacoes.listar(s, _ator(s, solicitante_id))
+
+
+def criar_organizacao(solicitante_id: int, nome: str, admin_username: str, admin_nome: str,
+                      admin_senha: str) -> Organizacao:
+    """Nova organização já com o primeiro administrador. Só para o superadmin."""
+    with nova_sessao() as s:
+        return s_organizacoes.criar(s, _ator(s, solicitante_id), nome, admin_username, admin_nome, admin_senha)
+
+
+def definir_organizacao_ativa(solicitante_id: int, organizacao_id: int, ativa: bool) -> Organizacao:
+    """Suspende (ninguém dela entra) ou reativa. Só para o superadmin."""
+    with nova_sessao() as s:
+        return s_organizacoes.definir_ativa(s, _ator(s, solicitante_id), organizacao_id, ativa)
 
 
 def listar_organizacoes() -> List[Organizacao]:
