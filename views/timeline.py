@@ -39,7 +39,7 @@ from database import (
     excluir_projeto,
 )
 from config import NOME_APP, RELATORIOS_DIR, UPLOAD_DIR, apagar_anexos, limpar_relatorios_antigos
-from layout import col, largura_dialogo, opcoes_dialogo, rotulo
+from layout import col, compacto, largura_dialogo, opcoes_dialogo, rotulo
 from logos import (
     EXTENSOES as EXTENSOES_LOGO,
     logo_empresa,
@@ -171,14 +171,15 @@ def build_timeline_view(
     pode_criar_projeto = bool(usuario.admin or getattr(usuario, "pode_criar_projetos", False))
 
     projeto_info = ft.Text(
-        f"Projeto Ativo: {projeto.nome}",
-        size=14,
-        weight=ft.FontWeight.W_600,
-        color=ft.Colors.PRIMARY,
+        projeto.nome,
+        size=17,
+        weight=ft.FontWeight.BOLD,
+        max_lines=1,
+        overflow=ft.TextOverflow.ELLIPSIS,
     )
     acesso_info = ft.Text("", size=12, color=ft.Colors.ON_SURFACE_VARIANT)
 
-    def ao_selecionar_projeto(evento):
+    async def ao_selecionar_projeto(evento):
         nonlocal projeto
         escolhido = next(
             (p for p in projetos if str(p.id) == evento.control.value), None
@@ -188,11 +189,12 @@ def build_timeline_view(
         projeto = escolhido
         nonlocal nivel
         nivel = nivel_no_projeto(usuario.id, projeto.id)
-        projeto_info.value = f"Projeto Ativo: {projeto.nome}"
+        projeto_info.value = projeto.nome
         aplicar_permissoes()
         if on_project_selected:
             on_project_selected(projeto)  # lembra a escolha no app.py
         carregar_timeline()
+        await _fechar_menu()
 
     seletor_projeto = ft.Dropdown(
         label="Projeto",
@@ -1442,46 +1444,64 @@ def build_timeline_view(
         if on_open_pendencias:
             await on_open_pendencias()
 
-    btn_pendencias = tema.botao_secundario(
-        rotulo(page, "Pendências", "Pend."), ft.Icons.PENDING_ACTIONS, abrir_pendencias
-    )
+    # ------------------------------------------------------------------ menu lateral
+    # A tela principal mostra só a linha do tempo, a busca e as duas ações principais.
+    # Todo o resto fica no menu lateral (☰), com as mesmas regras de permissão de antes.
+    tela = {}  # a View é criada no fim; os itens do menu fecham o menu antes de agir
+
+    async def _fechar_menu():
+        view = tela.get("view")
+        if view is not None and view.drawer is not None:
+            try:
+                await view.close_drawer()
+            except Exception:  # menu já fechado ou tela ainda não montada
+                pass
+
+    def _item(icone, texto, acao, cor=None, visivel=True):
+        async def clicar(evento):
+            await _fechar_menu()
+            resultado = acao(evento)
+            if inspect.isawaitable(resultado):
+                await resultado
+
+        return ft.ListTile(
+            leading=ft.Icon(icone, color=cor or ft.Colors.ON_SURFACE_VARIANT),
+            title=ft.Text(texto, color=cor),
+            on_click=clicar,
+            visible=visivel,
+        )
+
+    def _secao(texto, visivel=True):
+        return ft.Container(
+            visible=visivel,
+            padding=ft.Padding.only(left=28, top=18, bottom=4),
+            content=ft.Text(texto, size=12, weight=ft.FontWeight.W_600, color=ft.Colors.PRIMARY),
+        )
+
+    btn_pendencias = _item(ft.Icons.PENDING_ACTIONS, "Pendências de decisão", abrir_pendencias)
 
     def atualizar_botao_pendencias():
         """Mostra quantos assuntos aguardam decisão no projeto ativo."""
         abertas = contar_pendencias_abertas(projeto.id)
-        btn_pendencias.content = rotulo(page, "Pendências", "Pend.") + (f" ({abertas})" if abertas else "")
+        btn_pendencias.title.value = "Pendências de decisão" + (f" ({abertas})" if abertas else "")
 
-    # Gestão do projeto: discretas (texto com ícone, sem fundo).
-    btn_novo_projeto = ft.TextButton(
-        content=rotulo(page, "Novo Projeto", "Novo"),
-        icon=ft.Icons.CREATE_NEW_FOLDER_OUTLINED,
-        on_click=lambda _: page.show_dialog(modal_projeto),
-    )
-    btn_editar_projeto = ft.TextButton(
-        content=rotulo(page, "Editar Projeto", "Editar"), icon=ft.Icons.EDIT_OUTLINED, on_click=abrir_edicao_projeto
-    )
-    btn_excluir_projeto = ft.TextButton(
-        content=rotulo(page, "Excluir Projeto", "Excluir"),
-        icon=ft.Icons.DELETE_OUTLINE,
-        style=ft.ButtonStyle(color=ft.Colors.ERROR, icon_color=ft.Colors.ERROR),
-        on_click=abrir_exclusao_projeto,
-    )
-    btn_membros = ft.TextButton(
-        content="Membros", icon=ft.Icons.PEOPLE_OUTLINE, on_click=abrir_membros
-    )
-    # Ações frequentes: fundo suave.
-    btn_relatorio = tema.botao_secundario(
-        rotulo(page, "Relatório PDF", "PDF"), ft.Icons.PICTURE_AS_PDF, abrir_relatorio
-    )
-    btn_ficha = tema.botao_secundario(
-        rotulo(page, "Ficha do Empreendimento", "Ficha"), ft.Icons.ASSIGNMENT, abrir_ficha_empreendimento
-    )
-    # Ações principais: fundo colorido (azul e verde-azulado).
+    def _abrir_novo_projeto(_):
+        page.show_dialog(modal_projeto)
+
+    btn_ficha = _item(ft.Icons.ASSIGNMENT, "Ficha do Empreendimento", abrir_ficha_empreendimento)
+    btn_relatorio = _item(ft.Icons.PICTURE_AS_PDF, "Relatório PDF", abrir_relatorio)
+    btn_novo_projeto = _item(ft.Icons.CREATE_NEW_FOLDER_OUTLINED, "Novo projeto", _abrir_novo_projeto)
+    btn_editar_projeto = _item(ft.Icons.EDIT_OUTLINED, "Editar projeto", abrir_edicao_projeto)
+    btn_membros = _item(ft.Icons.PEOPLE_OUTLINE, "Membros e acessos", abrir_membros)
+    btn_excluir_projeto = _item(ft.Icons.DELETE_OUTLINE, "Excluir projeto", abrir_exclusao_projeto, cor=ft.Colors.ERROR)
+    secao_gestao = _secao("GESTÃO DO PROJETO")
+
+    # ------------------------------------------------------------------ ações principais
     btn_nova_decisao = tema.botao_destaque(
-        rotulo(page, "+ Nova Decisão", "+ Decisão"), ft.Icons.ADD_CIRCLE_OUTLINE, abrir_modal_decisao
+        rotulo(page, "+ Nova Decisão", "+ Decisão"), ft.Icons.ADD_CIRCLE_OUTLINE, abrir_modal_decisao, expand=True
     )
     btn_atas = tema.botao_destaque(
-        rotulo(page, "Atas de Reunião", "Atas"), ft.Icons.GROUPS, abrir_lista_atas, terciario=True
+        rotulo(page, "Atas de Reunião", "Atas"), ft.Icons.GROUPS, abrir_lista_atas, terciario=True, expand=True
     )
 
     def aplicar_permissoes():
@@ -1490,6 +1510,9 @@ def build_timeline_view(
         btn_editar_projeto.visible = nivel >= NIVEL_PAPEL["Responsável"]
         btn_membros.visible = nivel >= NIVEL_PAPEL["Responsável"]
         btn_excluir_projeto.visible = nivel >= NIVEL_PAPEL["Responsável"]
+        secao_gestao.visible = any(
+            b.visible for b in (btn_novo_projeto, btn_editar_projeto, btn_membros, btn_excluir_projeto)
+        )
         btn_nova_decisao.visible = nivel >= NIVEL_PAPEL["Editor"]
         atualizar_botao_pendencias()
         if usuario.admin:
@@ -1503,109 +1526,90 @@ def build_timeline_view(
 
     aplicar_permissoes()
 
-    def _icone(icone, dica, ao_clicar):
-        return ft.IconButton(icon=icone, tooltip=dica, on_click=ao_clicar, icon_color=ft.Colors.ON_SURFACE_VARIANT)
-
     claro = tema.eh_claro(page)
-    icones_conta = [
-        *(
-            [
-                _icone(ft.Icons.DOMAIN, "Plataforma: organizações (escritórios assinantes)", on_open_plataforma),
-            ]
-            if getattr(usuario, "superadmin", False) and on_open_plataforma
-            else []
-        ),
-        *(
-            [
-                _icone(ft.Icons.GROUP_ADD_OUTLINED, "Usuários da organização", abrir_usuarios),
-                _icone(ft.Icons.BUSINESS, "Logo da empresa (cabeçalho dos PDFs)", abrir_logo_empresa),
-            ]
-            if usuario.admin
-            else []
-        ),
-        *(
-            [
-                _icone(
+    eh_superadmin = bool(getattr(usuario, "superadmin", False) and on_open_plataforma)
+    menu = ft.NavigationDrawer(
+        bgcolor=ft.Colors.SURFACE_CONTAINER_LOW,
+        controls=[
+            ft.Container(
+                padding=ft.Padding.only(left=24, right=16, top=24, bottom=8),
+                content=ft.Column(
+                    spacing=2,
+                    controls=[
+                        ft.Row(spacing=10, controls=[
+                            ft.Icon(ft.Icons.TIMELINE, color=ft.Colors.PRIMARY, size=28),
+                            ft.Text("Memória de Projetos", size=18, weight=ft.FontWeight.BOLD),
+                        ]),
+                        ft.Text(usuario.nome_completo, size=13, color=ft.Colors.ON_SURFACE_VARIANT),
+                    ],
+                ),
+            ),
+            ft.Container(padding=ft.Padding.symmetric(horizontal=16, vertical=8), content=seletor_projeto),
+            _secao("PROJETO"),
+            btn_pendencias,
+            btn_ficha,
+            btn_relatorio,
+            secao_gestao,
+            btn_novo_projeto,
+            btn_editar_projeto,
+            btn_membros,
+            btn_excluir_projeto,
+            _secao("ADMINISTRAÇÃO", visivel=bool(usuario.admin or eh_superadmin)),
+            _item(ft.Icons.GROUP_ADD_OUTLINED, "Usuários da organização", abrir_usuarios, visivel=bool(usuario.admin)),
+            _item(ft.Icons.BUSINESS, "Logo da empresa (PDFs)", abrir_logo_empresa, visivel=bool(usuario.admin)),
+            _item(ft.Icons.DOMAIN, "Plataforma: organizações", on_open_plataforma or (lambda _: None),
+                  visivel=eh_superadmin),
+            ft.Divider(),
+            *(
+                [_item(
                     ft.Icons.DARK_MODE_OUTLINED if claro else ft.Icons.LIGHT_MODE_OUTLINED,
-                    "Mudar para o modo escuro" if claro else "Mudar para o modo claro",
+                    "Modo escuro" if claro else "Modo claro",
                     lambda _: on_trocar_tema(),
-                )
-            ]
-            if on_trocar_tema
-            else []
-        ),
-        _icone(ft.Icons.MANAGE_ACCOUNTS, "Minha conta (trocar senha)", abrir_conta),
-        _icone(ft.Icons.LOGOUT, "Sair", on_logout),
-    ]
+                )]
+                if on_trocar_tema
+                else []
+            ),
+            _item(ft.Icons.MANAGE_ACCOUNTS, "Minha conta (senha)", abrir_conta),
+            _item(ft.Icons.LOGOUT, "Sair", on_logout or (lambda _: None)),
+        ],
+    )
 
-    header = ft.Container(
-        padding=ft.Padding.symmetric(horizontal=18, vertical=14),
+    async def abrir_menu(_):
+        await tela["view"].show_drawer()
+
+    barra = ft.AppBar(
+        leading=ft.IconButton(icon=ft.Icons.MENU, tooltip="Menu", on_click=abrir_menu),
+        leading_width=56,
+        title=ft.Column(spacing=0, tight=True, controls=[projeto_info, acesso_info]),
         bgcolor=ft.Colors.SURFACE_CONTAINER,
-        border_radius=14,
-        content=ft.Column(
-            spacing=14,
-            controls=[
-                # Linha 1: identificação do projeto e ícones da conta
-                ft.ResponsiveRow(
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                    controls=[
-                        ft.Row(
-                            col=col(12, md=7),
-                            spacing=12,
-                            controls=[
-                                ft.Icon(ft.Icons.TIMELINE, size=34, color=ft.Colors.PRIMARY),
-                                ft.Column(
-                                    spacing=2,
-                                    controls=[
-                                        ft.Text("Memória de Projetos", size=22, weight=ft.FontWeight.BOLD),
-                                        projeto_info,
-                                        acesso_info,
-                                    ],
-                                ),
-                            ],
-                        ),
-                        ft.Row(
-                            col=col(12, md=5),
-                            wrap=True,
-                            spacing=0,
-                            alignment=ft.MainAxisAlignment.END,
-                            controls=icones_conta,
-                        ),
-                    ],
-                ),
-                # Linha 2: ações (principais em destaque) e gestão do projeto
-                ft.ResponsiveRow(
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                    controls=[
-                        ft.Row(
-                            col=col(12, lg=8),
-                            wrap=True,
-                            spacing=8,
-                            run_spacing=8,
-                            controls=[btn_nova_decisao, btn_atas, btn_pendencias, btn_ficha, btn_relatorio],
-                        ),
-                        ft.Row(
-                            col=col(12, lg=4),
-                            wrap=True,
-                            spacing=0,
-                            alignment=ft.MainAxisAlignment.END,
-                            controls=[btn_novo_projeto, btn_editar_projeto, btn_membros, btn_excluir_projeto],
-                        ),
-                    ],
-                ),
-            ],
-        ),
+        toolbar_height=64,
+    )
+
+    # Busca e as duas ações principais, logo acima da linha do tempo.
+    campo_busca.col = col(12, md=6)
+    acoes = ft.ResponsiveRow(
+        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+        run_spacing=8,
+        controls=[
+            campo_busca,
+            ft.Row(col=col(12, md=6), spacing=8, controls=[btn_nova_decisao, btn_atas]),
+        ],
     )
 
     carregar_timeline()
-    return ft.View(
+    margem = 8 if compacto(page) else 16
+    view = ft.View(
         route="/timeline",
+        appbar=barra,
+        drawer=menu,
+        padding=ft.Padding.symmetric(horizontal=margem, vertical=8),
+        spacing=6,
         controls=[
-            header,
-            ft.Divider(height=24, thickness=1, color=ft.Colors.OUTLINE_VARIANT),  # ações | busca
-            ft.ResponsiveRow([seletor_projeto, campo_busca]),
-            ft.Divider(),
+            acoes,
+            ft.Divider(height=12, thickness=1, color=ft.Colors.OUTLINE_VARIANT),
             timeline_list,
         ],
         services=[file_picker],
     )
+    tela["view"] = view
+    return view

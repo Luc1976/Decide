@@ -40,8 +40,17 @@ Ninguém perde acesso, mas faça assim:
 
 O administrador mais antigo (o usuário inicial) vira também **superadmin**.
 
+## Tela principal (linha do tempo)
+Pensada para o celular: a linha do tempo ocupa quase toda a tela.
+- Barra superior: ☰ (menu), nome do projeto e o seu nível de acesso.
+- Logo abaixo: **Buscar decisões**, **+ Nova Decisão** e **Atas de Reunião**.
+- Menu lateral (☰): troca de projeto, Pendências (com a contagem), Ficha, Relatório PDF,
+  gestão do projeto (novo, editar, membros, excluir), administração (usuários, logo,
+  plataforma) e conta (modo claro/escuro, senha, sair). Cada item só aparece para quem tem
+  permissão, como antes.
+
 ## Aparência: modo claro e escuro
-Ícone de sol/lua no canto superior da linha do tempo. A escolha fica guardada **no usuário**
+No menu lateral (☰), item "Modo claro" / "Modo escuro". A escolha fica guardada **no usuário**
 (vale em qualquer aparelho) e o padrão continua sendo o modo escuro. A migração 0003 cria essa
 preferência sozinha na partida (log: `Banco atualizado: versão 0002 -> 0003`).
 

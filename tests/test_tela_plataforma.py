@@ -32,7 +32,7 @@ class PaginaFalsa:
 
 
 def _filhos(c):
-    for nome in ("controls", "content", "actions", "title", "label"):
+    for nome in ("controls", "content", "actions", "title", "label", "appbar", "drawer", "leading", "subtitle"):
         v = getattr(c, nome, None)
         if isinstance(v, list):
             yield from v

@@ -109,47 +109,73 @@ def test_todas_as_telas_montam_nos_dois_modos(cenario, modo):
     assert "Estrutura" in _textos(telas[0]) and "Fechada" in _textos(telas[1])
 
 
-def test_cabecalho_destaca_nova_decisao_e_atas(cenario):
+def _menu_visivel(view) -> set:
+    return {b.title.value for b in _todos(view.drawer) if isinstance(b, ft.ListTile) and b.visible is not False}
+
+
+def test_tela_principal_tem_so_busca_e_acoes_principais(cenario):
     lucas, projeto = cenario
     view = _timeline(_pagina(tema.ESCURO), lucas, projeto)
-    destaque = {b.content: b for b in _todos(view) if isinstance(b, ft.FilledButton)}
+    acoes, separador, lista = view.controls
+    destaque = {b.content: b for b in _todos(acoes) if isinstance(b, ft.FilledButton)}
     assert set(destaque) == {"+ Nova Decisão", "Atas de Reunião"}
     assert destaque["Atas de Reunião"].style.bgcolor == ft.Colors.TERTIARY  # cor diferente
     assert destaque["+ Nova Decisão"].style.bgcolor is None  # azul principal do tema
-    secundarios = {b.content for b in _todos(view) if isinstance(b, ft.FilledTonalButton)}
-    assert {"Ficha do Empreendimento", "Relatório PDF"} <= secundarios
-    assert any(c.startswith("Pendências") for c in secundarios)
+    assert any(isinstance(x, ft.TextField) and x.label == "Buscar decisões" for x in _todos(acoes))
+    assert isinstance(separador, ft.Divider) and isinstance(lista, ft.ListView) and lista.expand
+    # nada além disso na área principal: o resto foi para o menu
+    assert not [b for b in _todos(acoes) if isinstance(b, (ft.FilledTonalButton, ft.TextButton, ft.ListTile))]
+    assert view.appbar.title.controls[0].value == projeto.nome
 
 
-def test_separador_entre_acoes_e_busca(cenario):
+def test_menu_lateral_tem_as_demais_opcoes(cenario):
     lucas, projeto = cenario
-    controles = _timeline(_pagina(tema.ESCURO), lucas, projeto).controls
-    assert isinstance(controles[1], ft.Divider)
-    assert isinstance(controles[2], ft.ResponsiveRow)
-    assert any(isinstance(x, ft.TextField) and x.label == "Buscar decisões" for x in _todos(controles[2]))
+    view = _timeline(_pagina(tema.ESCURO), lucas, projeto, trocar=lambda: None)
+    assert isinstance(view.drawer, ft.NavigationDrawer)
+    assert any(isinstance(x, ft.Dropdown) and x.label == "Projeto" for x in _todos(view.drawer))
+    assert {
+        "Pendências de decisão (2)", "Ficha do Empreendimento", "Relatório PDF",
+        "Novo projeto", "Editar projeto", "Membros e acessos", "Excluir projeto",
+        "Usuários da organização", "Logo da empresa (PDFs)", "Plataforma: organizações",
+        "Modo claro", "Minha conta (senha)", "Sair",
+    } <= _menu_visivel(view)
 
 
-def test_botao_de_tema_alterna_e_mostra_o_modo_oposto(cenario):
+def test_item_do_menu_fecha_o_menu_e_executa(cenario):
+    import asyncio
+
     lucas, projeto = cenario
     chamadas = []
-    escuro = _timeline(_pagina(tema.ESCURO), lucas, projeto, trocar=lambda: chamadas.append(1))
-    botao = next(b for b in _todos(escuro) if isinstance(b, ft.IconButton) and b.tooltip == "Mudar para o modo claro")
-    botao.on_click(None)
-    assert chamadas == [1]
+    view = _timeline(_pagina(tema.ESCURO), lucas, projeto, trocar=lambda: chamadas.append("tema"))
+    item = next(b for b in _todos(view.drawer) if isinstance(b, ft.ListTile) and b.title.value == "Modo claro")
+    asyncio.run(item.on_click(None))  # fora de uma página real, fechar o menu é ignorado
+    assert chamadas == ["tema"]
     claro = _timeline(_pagina(tema.CLARO), lucas, projeto, trocar=lambda: None)
-    assert any(isinstance(b, ft.IconButton) and b.tooltip == "Mudar para o modo escuro" for b in _todos(claro))
+    assert "Modo escuro" in _menu_visivel(claro)
 
 
-def test_permissoes_do_cabecalho_nao_mudaram(cenario):
-    """Leitor continua sem 'Nova Decisão' e sem gestão do projeto; vê Atas, Ficha e Relatório."""
+def test_permissoes_nao_mudaram(cenario):
+    """Leitor: sem 'Nova Decisão' e sem gestão do projeto; vê Atas, Ficha, Relatório e Pendências."""
     lucas, projeto = cenario
     db.criar_usuario("cli", "senha123", "Cliente", pode_criar_projetos=False)
     db.definir_membro(projeto.id, "cli", "Leitor", lucas.id)
     view = _timeline(_pagina(tema.CLARO), _usuario("cli"), projeto)
-    visiveis = {b.content for b in _todos(view)
-                if isinstance(b, (ft.Button, ft.TextButton)) and b.visible is not False}
-    assert "+ Nova Decisão" not in visiveis
-    assert not {"Novo Projeto", "Editar Projeto", "Membros", "Excluir Projeto"} & visiveis
-    assert {"Atas de Reunião", "Ficha do Empreendimento", "Relatório PDF"} <= visiveis
-    dicas = {b.tooltip for b in _todos(view) if isinstance(b, ft.IconButton)}
-    assert "Usuários da organização" not in dicas and not any("Plataforma" in (d or "") for d in dicas)
+    botoes = {b.content: b.visible for b in _todos(view.controls[0]) if isinstance(b, ft.FilledButton)}
+    assert botoes == {"+ Nova Decisão": False, "Atas de Reunião": True}
+    menu = _menu_visivel(view)
+    assert {"Ficha do Empreendimento", "Relatório PDF", "Sair"} <= menu
+    assert any(m.startswith("Pendências") for m in menu)
+    assert not {"Novo projeto", "Editar projeto", "Membros e acessos", "Excluir projeto",
+                "Usuários da organização", "Plataforma: organizações"} & menu
+    secoes = [x for x in _todos(view.drawer) if isinstance(x, ft.Container)
+              and isinstance(x.content, ft.Text) and x.content.value == "GESTÃO DO PROJETO"]
+    assert secoes and secoes[0].visible is False
+
+
+def test_celular_margens_menores_e_rotulos_curtos(cenario):
+    lucas, projeto = cenario
+    pagina = _pagina(tema.ESCURO)
+    pagina.width = 390
+    view = _timeline(pagina, lucas, projeto)
+    assert view.padding.left == 8
+    assert {b.content for b in _todos(view.controls[0]) if isinstance(b, ft.FilledButton)} == {"+ Decisão", "Atas"}
