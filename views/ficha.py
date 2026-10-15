@@ -1,6 +1,7 @@
 import datetime
 
 import flet as ft
+from marca import marca_cabecalho
 
 import tema
 from database import (
@@ -293,6 +294,7 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar, on_open_docum
                 ft.Column(
                     col=col(12, md=5),
                     controls=[
+                        marca_cabecalho(),
                         ft.Text(
                             "Ficha do Empreendimento",
                             size=22,

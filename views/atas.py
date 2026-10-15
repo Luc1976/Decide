@@ -4,6 +4,7 @@ import uuid
 from urllib.parse import quote
 
 import flet as ft
+from marca import marca_cabecalho
 
 import tema
 import ia_transcricao
@@ -831,6 +832,7 @@ def build_atas_view(
                 ft.Column(
                     col=col(12, md=5),
                     controls=[
+                        marca_cabecalho(),
                         ft.Text(
                             "Atas de Reunião",
                             size=22,

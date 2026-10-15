@@ -51,6 +51,7 @@ from logos import (
     salvar_logo_projeto,
 )
 from models import CATEGORIAS, IMPACTOS, NIVEL_PAPEL, PAPEIS
+from marca import marca_cabecalho
 from seguranca import assinar_token, segredo_do_servidor
 
 PASTA_ANEXOS = "anexos_projetos"
@@ -1541,10 +1542,7 @@ def build_timeline_view(
                 content=ft.Column(
                     spacing=2,
                     controls=[
-                        ft.Row(spacing=10, controls=[
-                            ft.Icon(ft.Icons.TIMELINE, color=ft.Colors.PRIMARY, size=28),
-                            ft.Text("Memória de Projetos", size=18, weight=ft.FontWeight.BOLD),
-                        ]),
+                        marca_cabecalho(altura=56),
                         ft.Text(usuario.nome_completo, size=13, color=ft.Colors.ON_SURFACE_VARIANT),
                     ],
                 ),
@@ -1585,7 +1583,13 @@ def build_timeline_view(
     barra = ft.AppBar(
         leading=ft.IconButton(icon=ft.Icons.MENU, tooltip="Menu", on_click=abrir_menu),
         leading_width=56,
-        title=ft.Column(spacing=0, tight=True, controls=[projeto_info, acesso_info]),
+        title=ft.Row(
+            spacing=10,
+            controls=[
+                marca_cabecalho(altura=44),
+                ft.Column(spacing=0, tight=True, controls=[projeto_info, acesso_info]),
+            ],
+        ),
         bgcolor=ft.Colors.SURFACE_CONTAINER,
         toolbar_height=64,
     )

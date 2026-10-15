@@ -1,4 +1,5 @@
 import flet as ft
+from marca import marca_login
 
 from layout import compacto, largura_campo
 
@@ -39,21 +40,7 @@ def build_login_view(on_login, page=None):
                             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                             spacing=20,
                             controls=[
-                                ft.Icon(
-                                    ft.Icons.ARCHITECTURE,
-                                    size=60,
-                                    color=ft.Colors.PRIMARY,
-                                ),
-                                ft.Text(
-                                    "Ru.A Estudio",
-                                    size=24,
-                                    weight=ft.FontWeight.BOLD,
-                                ),
-                                ft.Text(
-                                    "Gestão de Decisões de Projetos",
-                                    size=14,
-                                    color=ft.Colors.ON_SURFACE_VARIANT,
-                                ),
+                                marca_login(),
                                 ft.Divider(),
                                 input_user,
                                 input_senha,
