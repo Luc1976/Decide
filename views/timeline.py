@@ -38,6 +38,7 @@ from database import (
 from config import NOME_APP, RELATORIOS_DIR, UPLOAD_DIR, apagar_anexos, limpar_relatorios_antigos
 from layout import col, largura_dialogo, opcoes_dialogo, rotulo
 from models import CATEGORIAS, IMPACTOS, NIVEL_PAPEL, PAPEIS
+from marca import marca_cabecalho
 from seguranca import assinar_token, segredo_do_servidor
 
 PASTA_ANEXOS = "anexos_projetos"
@@ -1300,6 +1301,7 @@ def build_timeline_view(
             controls=[
                 ft.Column(
                     [
+                        marca_cabecalho(),
                         ft.Text(
                             "Memória de Projetos",
                             size=22,

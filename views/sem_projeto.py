@@ -1,4 +1,5 @@
 import flet as ft
+from marca import marca_cabecalho
 from database import criar_projeto
 from layout import largura_campo
 
@@ -51,7 +52,7 @@ def build_sem_projeto_view(page, usuario, on_logout, on_project_created):
                 content=ft.Row(
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     controls=[
-                        ft.Text("Memória de Projetos", size=22, weight=ft.FontWeight.BOLD),
+                        marca_cabecalho(),
                         ft.IconButton(icon=ft.Icons.LOGOUT, tooltip="Sair", on_click=on_logout),
                     ],
                 ),

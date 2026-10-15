@@ -4,6 +4,7 @@ import uuid
 from urllib.parse import quote
 
 import flet as ft
+from marca import marca_cabecalho
 import ia_transcricao
 from ata_pdf import gerar_ata_pdf, nome_do_arquivo_ata
 from config import NOME_APP, RELATORIOS_DIR, limpar_relatorios_antigos
@@ -787,6 +788,7 @@ def build_atas_view(
                 ft.Column(
                     col=col(12, md=5),
                     controls=[
+                        marca_cabecalho(),
                         ft.Text(
                             "Atas de Reunião",
                             size=22,

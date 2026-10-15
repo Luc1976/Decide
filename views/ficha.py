@@ -10,6 +10,7 @@ from database import (
 )
 from ficha_calculos import calcular_indicadores
 from models import CAMPOS_LONGOS, FICHA_GRUPOS, GRUPO_OUTRAS, NIVEL_PAPEL
+from marca import marca_cabecalho
 from layout import col, largura_dialogo, opcoes_dialogo
 from views.questionario_sistemas import criar_aba_sistemas_construtivos
 
@@ -282,6 +283,7 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar):
                 ft.Column(
                     col=col(12, md=5),
                     controls=[
+                        marca_cabecalho(),
                         ft.Text(
                             "Ficha do Empreendimento",
                             size=22,
