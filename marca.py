@@ -22,7 +22,7 @@ def marca_cabecalho(altura: int = 72) -> ft.Control:
         bgcolor=COR_FUNDO_CABECALHO,
         border_radius=8,
         padding=6,
-        content=ft.Image(src_base64=LOGO_CABECALHO_B64, height=altura),  # largura automática: mantém a proporção
+        content=ft.Image(src=LOGO_CABECALHO_B64, height=altura),  # largura automática: mantém a proporção
     )
 
 
@@ -32,5 +32,5 @@ def marca_login(altura: int = 190) -> ft.Control:
         bgcolor=COR_FUNDO_LOGIN,
         border_radius=12,
         padding=12,
-        content=ft.Image(src_base64=LOGO_LOGIN_B64, height=altura),  # largura automática: mantém a proporção
+        content=ft.Image(src=LOGO_LOGIN_B64, height=altura),  # largura automática: mantém a proporção
     )
