@@ -1,4 +1,6 @@
 import flet as ft
+from marca import marca_login
+
 from layout import compacto, largura_campo
 
 
@@ -17,7 +19,7 @@ def build_login_view(on_login, page=None):
         can_reveal_password=True,
         prefix_icon=ft.Icons.LOCK,
     )
-    msg_erro = ft.Text("", color=ft.Colors.RED_400, size=12)
+    msg_erro = ft.Text("", color=ft.Colors.ERROR, size=12)
 
     async def fazer_login(_):
         await on_login(input_user.value, input_senha.value, msg_erro)
@@ -38,21 +40,7 @@ def build_login_view(on_login, page=None):
                             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                             spacing=20,
                             controls=[
-                                ft.Icon(
-                                    ft.Icons.ARCHITECTURE,
-                                    size=60,
-                                    color=ft.Colors.BLUE_400,
-                                ),
-                                ft.Text(
-                                    "Ru.A Estudio",
-                                    size=24,
-                                    weight=ft.FontWeight.BOLD,
-                                ),
-                                ft.Text(
-                                    "Gestão de Decisões de Projetos",
-                                    size=14,
-                                    color=ft.Colors.GREY_400,
-                                ),
+                                marca_login(),
                                 ft.Divider(),
                                 input_user,
                                 input_senha,

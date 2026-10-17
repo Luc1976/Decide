@@ -1,3 +1,5 @@
+import os
+
 import flet as ft
 
 from app import main
@@ -14,7 +16,14 @@ from database import (  # noqa: E402  (depois de checar a pasta)
     usuarios_com_senha_padrao,
 )
 
-init_db()  # cria o banco e o administrador inicial uma única vez, na partida do servidor
+from nucleo.db import ErroConexaoBanco, endereco_seguro  # noqa: E402
+
+print(f"[memoria] Banco: {endereco_seguro()}", flush=True)
+try:
+    init_db()  # migrações + administrador inicial (só num banco novo), na partida do servidor
+except ErroConexaoBanco as erro:
+    print(f"[memoria] ERRO: {erro}", flush=True)
+    raise SystemExit(1)
 aplicar_reset_de_senha_do_ambiente()  # só age se MEMORIA_RESETAR_SENHA estiver definida
 
 _inseguros = usuarios_com_senha_padrao()
@@ -30,6 +39,12 @@ if MODO_WEB:
     print(f"[memoria] Modo site: porta {PORTA}, dados em {DATA_DIR}", flush=True)
     # Site: o Python roda no servidor e o navegador é só a tela. Exportamos o app ASGI
     # (FastAPI) para acrescentar a rota protegida dos anexos e servir com o uvicorn.
+    # O Flet só aceita uploads (anexos e logos) com FLET_SECRET_KEY definida, e a lê ao
+    # montar o servidor. Sem ela no ambiente, usamos uma chave derivada do segredo do app.
+    if not os.getenv("FLET_SECRET_KEY"):
+        from seguranca import segredo_uploads_flet
+
+        os.environ["FLET_SECRET_KEY"] = segredo_uploads_flet()
     try:
         from anexos_web import registrar_rota_anexos
 

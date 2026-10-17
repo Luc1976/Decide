@@ -1,8 +1,8 @@
 """Rascunho de ata a partir da transcrição de uma reunião (Teams, etc.) usando IA.
 
 A IA NUNCA registra nada sozinha: ela devolve sugestões, este módulo as transforma em um
-texto de ata com linhas [D] (decisão) e [F] (ficha), e uma pessoa revisa, edita e fecha a ata
-no editor de sempre.
+texto de ata com linhas [D] (decisão), [F] (ficha) e [P] (assunto pendente de decisão), e uma
+pessoa revisa, edita e fecha a ata no editor de sempre.
 
 Configuração (variáveis de ambiente, só no servidor; a chave nunca vai para o navegador):
   ANTHROPIC_API_KEY        chave da API da Anthropic (ou MEMORIA_ANTHROPIC_API_KEY).
@@ -179,7 +179,9 @@ SISTEMA = """Você é secretário(a) técnico(a) de uma equipe de projetos de ar
 Recebe a transcrição de uma reunião e o contexto do projeto, e propõe o que deve entrar na ata.
 Regras:
 - Responda SOMENTE com um objeto JSON válido, sem texto antes ou depois e sem cercas de código.
-- Só inclua DECISÕES realmente tomadas na reunião. Dúvidas, ideias em discussão e tarefas sem decisão vão em "pendencias".
+- Só inclua DECISÕES realmente tomadas na reunião. Assuntos discutidos que ficaram SEM decisão (dúvidas, alternativas em estudo, itens que dependem de resposta de alguém) vão em "pendencias".
+- Cada pendência é um assunto que precisa ser decidido depois, escrito como uma frase curta; inclua quem deve trazer a resposta e o prazo, se forem citados.
+- Se a reunião decidiu um dos assuntos pendentes informados no contexto, registre-o em "decisoes" e comece o título com o código dele (ex.: "P-003: ..."); não o repita em "pendencias".
 - Não invente nada que não esteja na transcrição. Se não houver responsável ou prazo, use "".
 - "trecho" é uma frase curta (até 200 caracteres) copiada da transcrição que sustenta o item.
 - "alteracoes_ficha" só quando a reunião fixou ou mudou um dado da ficha do empreendimento; "campo" deve ser um dos nomes de campo informados no contexto.
@@ -264,7 +266,7 @@ def _extrair_json(texto: str) -> dict:
     raise ErroIA("Não consegui interpretar a resposta da IA. Tente novamente.")
 
 
-def _contexto(projeto_nome, categorias, impactos, campos_ficha, decisoes_recentes) -> str:
+def _contexto(projeto_nome, categorias, impactos, campos_ficha, decisoes_recentes, pendencias_abertas=()) -> str:
     linhas = [f"Projeto: {projeto_nome}", f"Categorias: {', '.join(categorias)}"]
     linhas.append(f"Impactos: {', '.join(impactos)}")
     nomes = [c[1] for c in campos_ficha]
@@ -273,6 +275,9 @@ def _contexto(projeto_nome, categorias, impactos, campos_ficha, decisoes_recente
     if decisoes_recentes:
         linhas.append("Decisões já registradas (não repita as que forem iguais):")
         linhas += [f"- {d}" for d in decisoes_recentes[-30:]]
+    if pendencias_abertas:
+        linhas.append("Assuntos pendentes de decisão, em aberto (não repita os mesmos assuntos):")
+        linhas += [f"- {p}" for p in list(pendencias_abertas)[:40]]
     return "\n".join(linhas)
 
 
@@ -282,10 +287,23 @@ def _uma_linha(texto) -> str:
     return " ".join(str(texto or "").split())
 
 
+def _texto_pendencia(item) -> str:
+    """A IA às vezes devolve a pendência como objeto em vez de texto: aceita os dois."""
+    if isinstance(item, dict):
+        assunto = _uma_linha(item.get("assunto") or item.get("titulo") or item.get("descricao"))
+        extras = [
+            f"{rotulo}: {_uma_linha(item.get(chave))}"
+            for chave, rotulo in (("responsavel", "responsável"), ("prazo", "prazo"))
+            if _uma_linha(item.get(chave))
+        ]
+        return f"{assunto} ({'; '.join(extras)})" if assunto and extras else assunto
+    return _uma_linha(item)
+
+
 def _juntar(resultados: list) -> dict:
     """Une as respostas de vários blocos, sem repetir decisões iguais."""
     junto = {"resumo": [], "decisoes": [], "alteracoes_ficha": [], "pendencias": []}
-    vistos = set()
+    vistos, pendencias_vistas = set(), set()
     for r in resultados:
         if r.get("resumo"):
             junto["resumo"].append(_uma_linha(r["resumo"]))
@@ -295,7 +313,11 @@ def _juntar(resultados: list) -> dict:
                 vistos.add(chave)
                 junto["decisoes"].append(d)
         junto["alteracoes_ficha"] += r.get("alteracoes_ficha") or []
-        junto["pendencias"] += r.get("pendencias") or []
+        for p in r.get("pendencias") or []:
+            texto = _texto_pendencia(p)
+            if texto and texto.casefold() not in pendencias_vistas:
+                pendencias_vistas.add(texto.casefold())
+                junto["pendencias"].append(texto)
     junto["resumo"] = " ".join(junto["resumo"])
     return junto
 
@@ -355,9 +377,11 @@ def montar_texto_ata(dados: dict, campos_ficha: list, categorias, impactos):
         if _uma_linha(d.get("trecho")):
             linhas.append(f"   Trecho: \"{_uma_linha(d['trecho'])}\"")
 
-    pendencias = [_uma_linha(p) for p in dados.get("pendencias") or [] if _uma_linha(p)]
+    pendencias = [_texto_pendencia(p) for p in dados.get("pendencias") or []]
+    pendencias = [p for p in pendencias if p]
     if pendencias:
-        linhas += ["", "Pendências (sem decisão)"] + [f"- {p}" for p in pendencias]
+        # Linhas [P] viram registros na tela de Pendências quando a ata é fechada.
+        linhas += ["", "Pendências (assuntos sem decisão)"] + [f"[P] {p}" for p in pendencias]
     if not decisoes and not cabecalho_f:
         avisos.append("A IA não encontrou decisões nesta transcrição.")
     return "\n".join(linhas), avisos
@@ -372,6 +396,7 @@ def gerar_rascunho(
     campos_ficha: list,
     decisoes_recentes: Optional[list] = None,
     chamar: Optional[Callable[[str, str], str]] = None,
+    pendencias_abertas: Optional[list] = None,
 ) -> dict:
     """Gera o rascunho da ata. Devolve {"texto", "participantes", "avisos"}.
     'chamar' (sistema, usuario) -> texto existe para testes; em produção usa a API."""
@@ -386,7 +411,9 @@ def gerar_rascunho(
         conferir_limite(projeto_id)
         chamar = _chamar_api
 
-    contexto = _contexto(projeto_nome, categorias, impactos, campos_ficha, decisoes_recentes or [])
+    contexto = _contexto(
+        projeto_nome, categorias, impactos, campos_ficha, decisoes_recentes or [], pendencias_abertas or []
+    )
     blocos = dividir_em_blocos(limpo)
     resultados = []
     for i, bloco in enumerate(blocos, 1):

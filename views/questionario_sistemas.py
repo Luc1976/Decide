@@ -1,5 +1,7 @@
 import flet as ft
 
+import tema
+
 from database import obter_padrao_construtivo, salvar_padrao_construtivo
 from ficha_calculos import numero_br
 from models import TipologiaProjeto
@@ -177,7 +179,7 @@ def criar_aba_sistemas_construtivos(page, projeto, usuario, pode_editar: bool):
             return
         tipologia = dropdown_tipologia.value
         if not tipologia:
-            mensagem.color = ft.Colors.RED_400
+            mensagem.color = ft.Colors.ERROR
             mensagem.value = "Selecione a tipologia do projeto."
             page.update()
             return
@@ -188,7 +190,7 @@ def criar_aba_sistemas_construtivos(page, projeto, usuario, pode_editar: bool):
                 if valor:
                     numero = numero_br(valor)
                     if numero is None:
-                        mensagem.color = ft.Colors.RED_400
+                        mensagem.color = ft.Colors.ERROR
                         mensagem.value = "Informe a carga de piso com um número válido."
                         page.update()
                         return
@@ -200,13 +202,13 @@ def criar_aba_sistemas_construtivos(page, projeto, usuario, pode_editar: bool):
         try:
             salvar_padrao_construtivo(projeto.id, dados, usuario_id=usuario.id)
         except Exception as erro:
-            mensagem.color = ft.Colors.RED_400
+            mensagem.color = ft.Colors.ERROR
             mensagem.value = f"Não foi possível guardar: {erro}"
             page.update()
             return
         nonlocal salvo
         salvo = obter_padrao_construtivo(projeto.id)
-        mensagem.color = ft.Colors.GREEN_400
+        mensagem.color = tema.sucesso(page)
         mensagem.value = "Premissas de sistemas construtivos guardadas."
         page.update()
 
@@ -227,7 +229,7 @@ def criar_aba_sistemas_construtivos(page, projeto, usuario, pode_editar: bool):
 
     if projeto is None:
         return ft.Column(
-            [ft.Text("Sem projeto ativo.", color=ft.Colors.GREY_400)],
+            [ft.Text("Sem projeto ativo.", color=ft.Colors.ON_SURFACE_VARIANT)],
             expand=True,
         )
 

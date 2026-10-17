@@ -3,10 +3,15 @@ import math
 
 import flet as ft
 
-from database import autenticar_usuario, init_db, listar_projetos_do_usuario, pode_no_projeto
+import tema
+
+from database import autenticar_usuario, definir_tema, init_db, listar_projetos_do_usuario, pode_no_projeto
 from views.atas import build_atas_view
+from views.documentos import build_documentos_view
 from views.ficha import build_ficha_view
 from views.login import build_login_view
+from views.pendencias import build_pendencias_view
+from views.plataforma import build_plataforma_view
 from views.sem_projeto import build_sem_projeto_view
 from views.timeline import build_timeline_view
 from seguranca import LimitadorTentativas
@@ -17,7 +22,7 @@ LIMITADOR_LOGIN = LimitadorTentativas(maximo=5, janela_s=900, bloqueio_s=900)
 
 def main(page: ft.Page):
     page.title = "Ru.A Estudio - Memória de Projetos"
-    page.theme_mode = ft.ThemeMode.DARK
+    tema.configurar(page)  # temas claro e escuro; começa no escuro até o login
     page.padding = 20
 
     init_db()
@@ -44,6 +49,36 @@ def main(page: ft.Page):
                 abrir_atas,
                 abrir_ficha,
                 projeto_excluido,
+                abrir_pendencias,
+                abrir_plataforma,
+                trocar_tema,
+            )
+        )
+
+    def trocar_tema():
+        """Alterna claro/escuro, guarda a escolha do usuário e redesenha a tela atual."""
+        novo = tema.oposto(tema.modo_atual(page))
+        tema.aplicar_modo(page, novo)
+        if usuario_logado is not None:
+            usuario_logado.tema = novo
+            try:
+                definir_tema(usuario_logado.id, novo)
+            except Exception as erro:  # a preferência é conveniência: nunca derruba a tela
+                print(f"[memoria] Não foi possível guardar o tema: {erro}", flush=True)
+        route_change(None)
+
+    def montar_plataforma():
+        mostrar_view(build_plataforma_view(page, usuario_logado, sair, voltar_timeline))
+
+    def montar_pendencias():
+        mostrar_view(
+            build_pendencias_view(
+                page,
+                projeto_ativo,
+                usuario_logado,
+                sair,
+                voltar_timeline,
+                abrir_atas,
             )
         )
 
@@ -55,8 +90,12 @@ def main(page: ft.Page):
                 usuario_logado,
                 sair,
                 voltar_timeline,
+                abrir_documentos,
             )
         )
+
+    def montar_documentos():
+        mostrar_view(build_documentos_view(page, projeto_ativo, usuario_logado, sair, abrir_ficha))
 
     def montar_atas():
         nonlocal ata_para_abrir
@@ -86,6 +125,7 @@ def main(page: ft.Page):
         if usuario:
             LIMITADOR_LOGIN.sucesso(chave)
             usuario_logado = usuario
+            tema.aplicar_modo(page, usuario.tema)  # modo escolhido por ele (padrão: escuro)
             projetos = listar_projetos_do_usuario(usuario.id)
             projeto_ativo = projetos[0] if projetos else None
             await page.push_route("/timeline")
@@ -121,6 +161,15 @@ def main(page: ft.Page):
     async def abrir_ficha(_=None):
         await page.push_route("/ficha")
 
+    async def abrir_pendencias(_=None):
+        await page.push_route("/pendencias")
+
+    async def abrir_documentos(_=None):
+        await page.push_route("/documentos")
+
+    async def abrir_plataforma(_=None):
+        await page.push_route("/plataforma")
+
     async def voltar_timeline(_=None):
         await page.push_route("/timeline")
 
@@ -152,6 +201,8 @@ def main(page: ft.Page):
                 asyncio.create_task(page.push_route("/login"))
                 return
             mostrar_view(build_login_view(fazer_login, page))
+        elif page.route == "/plataforma":
+            montar_plataforma()  # não depende de projeto; a própria tela confere o superadmin
         elif not garantir_projeto_valido():
             mostrar_view(
                 build_sem_projeto_view(page, usuario_logado, sair, projeto_criado)
@@ -162,6 +213,10 @@ def main(page: ft.Page):
             montar_atas()
         elif page.route == "/ficha":
             montar_ficha()
+        elif page.route == "/pendencias":
+            montar_pendencias()
+        elif page.route == "/documentos":
+            montar_documentos()
         else:
             asyncio.create_task(page.push_route("/timeline"))
 

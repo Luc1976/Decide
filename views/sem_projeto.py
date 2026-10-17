@@ -1,4 +1,6 @@
 import flet as ft
+from marca import marca_cabecalho
+
 from database import criar_projeto
 from layout import largura_campo
 
@@ -6,7 +8,7 @@ from layout import largura_campo
 def build_sem_projeto_view(page, usuario, on_logout, on_project_created):
     """Tela para quem ainda não tem acesso a nenhum projeto."""
     pode_criar = bool(usuario.admin or getattr(usuario, "pode_criar_projetos", False))
-    mensagem = ft.Text("", color=ft.Colors.RED_400, size=12)
+    mensagem = ft.Text("", color=ft.Colors.ERROR, size=12)
     input_nome = ft.TextField(label="Nome do projeto", width=largura_campo(page, 400))
     input_cliente = ft.TextField(label="Cliente", width=largura_campo(page, 400))
     input_descricao = ft.TextField(
@@ -27,7 +29,7 @@ def build_sem_projeto_view(page, usuario, on_logout, on_project_created):
     if pode_criar:
         corpo = [
             ft.Text("Você ainda não tem projetos.", size=18, weight=ft.FontWeight.BOLD),
-            ft.Text("Crie o primeiro para começar a registrar decisões.", color=ft.Colors.GREY_400),
+            ft.Text("Crie o primeiro para começar a registrar decisões.", color=ft.Colors.ON_SURFACE_VARIANT),
             input_nome,
             input_cliente,
             input_descricao,
@@ -39,7 +41,7 @@ def build_sem_projeto_view(page, usuario, on_logout, on_project_created):
             ft.Text("Nenhum projeto disponível.", size=18, weight=ft.FontWeight.BOLD),
             ft.Text(
                 "Peça ao responsável pelo projeto para incluir o seu usuário.",
-                color=ft.Colors.GREY_400,
+                color=ft.Colors.ON_SURFACE_VARIANT,
             ),
         ]
 
@@ -51,7 +53,7 @@ def build_sem_projeto_view(page, usuario, on_logout, on_project_created):
                 content=ft.Row(
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     controls=[
-                        ft.Text("Memória de Projetos", size=22, weight=ft.FontWeight.BOLD),
+                        marca_cabecalho(),
                         ft.IconButton(icon=ft.Icons.LOGOUT, tooltip="Sair", on_click=on_logout),
                     ],
                 ),

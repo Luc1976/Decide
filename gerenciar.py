@@ -1,8 +1,10 @@
 """Gestão de usuários pela linha de comando (útil no servidor).
 
   python gerenciar.py listar
-  python gerenciar.py criar-usuario <usuario> "<Nome Completo>" [--admin] [--cliente]
+  python gerenciar.py criar-usuario <usuario> "<Nome Completo>" [--admin] [--cliente] [--org=<slug>]
       --cliente = não pode criar projetos próprios (só acompanha os que receber acesso)
+      --org     = organização do usuário (obrigatório quando houver mais de uma)
+  python gerenciar.py organizacoes
   python gerenciar.py trocar-senha <usuario>
 
 A senha é pedida no terminal (não aparece na tela nem fica no histórico).
@@ -11,7 +13,7 @@ No Docker:  docker compose exec app python gerenciar.py trocar-senha lucas
 import getpass
 import sys
 
-from database import alterar_senha, criar_usuario, init_db, listar_usernames
+from database import alterar_senha, criar_usuario, init_db, listar_organizacoes, listar_usernames
 
 
 def _pedir_senha() -> str:
@@ -27,13 +29,19 @@ def main(argv: list) -> int:
         print("\n".join(listar_usernames()) or "(nenhum usuário)")
         return 0
     try:
+        if argv[0] == "organizacoes":
+            for org in listar_organizacoes():
+                print(f"{org.slug}\t{org.nome}" + ("" if org.ativa else "\t(suspensa)"))
+            return 0
         if argv[0] == "criar-usuario" and len(argv) >= 3:
+            slug = next((a.split("=", 1)[1] for a in argv[3:] if a.startswith("--org=")), None)
             criar_usuario(
                 argv[1],
                 _pedir_senha(),
                 argv[2],
                 admin="--admin" in argv[3:],
                 pode_criar_projetos="--cliente" not in argv[3:],
+                organizacao_slug=slug,
             )
             print(f"Usuário '{argv[1]}' criado.")
             return 0

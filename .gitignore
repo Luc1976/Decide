@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.env
+memoria_projetos.db*
+uploads/
+relatorios/
+logos/
+assets/
+segredo.key
+uso_ia.json
