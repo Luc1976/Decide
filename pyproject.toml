@@ -9,7 +9,7 @@ authors = [
 dependencies = [
     "flet",
     "flet-web",   # servidor web (necessário para publicar como site)
-    "fastapi",
+    "fastapi==0.142.2",  # fixado: flet-web 1.0.3 passa openapi_prefix, que versões mais novas do FastAPI removeram
     "uvicorn[standard]",
     "sqlmodel",
     "reportlab",  # relatório de decisões em PDF
