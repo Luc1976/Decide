@@ -8,6 +8,7 @@ from nucleo.ator import Ator
 from nucleo.erros import NaoEncontrado, SemPermissao
 from nucleo.permissoes import exigir_admin, organizacao_ativa
 from nucleo.senhas import eh_hash, hash_senha, senha_confere, validar_nova_senha
+from nucleo import planos
 from nucleo.tabelas import Organizacao, Usuario
 
 MENSAGEM_ORG_DESATIVADA = "O acesso da sua organização está suspenso. Fale com o suporte do Decidiu."
@@ -61,8 +62,13 @@ def novo_usuario(s: Session, username: str, senha: str, nome_completo: str, orga
     if " " in username:
         raise ValueError("O usuário não pode conter espaços.")
     validar_nova_senha(senha)
-    if s.get(Organizacao, organizacao_id) is None:
+    org = s.get(Organizacao, organizacao_id)
+    if org is None:
         raise ValueError("Organização não encontrada.")
+    admins, colaboradores = planos.contar_usuarios(s, organizacao_id)
+    erro = planos.erro_limite_usuario(org, admins, colaboradores, novo_admin=admin)
+    if erro:
+        raise ValueError(erro)
     # O login é único na plataforma toda (a pessoa entra só com o usuário).
     if buscar_por_username(s, username):
         raise ValueError(f"O usuário '{username}' já existe.")

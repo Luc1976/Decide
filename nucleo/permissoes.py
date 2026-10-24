@@ -60,7 +60,10 @@ def exigir(s: Session, ator: Ator, projeto_id: int, minimo: str = LEITOR) -> int
 
 def organizacao_ativa(s: Session, organizacao_id: Optional[int]) -> bool:
     org = s.get(Organizacao, organizacao_id) if organizacao_id is not None else None
-    return org is not None and bool(org.ativa)
+    if org is None or not org.ativa:
+        return False
+    from nucleo.planos import acesso_liberado  # import tardio: planos depende só de tabelas
+    return acesso_liberado(org)
 
 
 def mesma_organizacao_ativa(s: Session, usuario: Usuario, organizacao_id: Optional[int]) -> bool:

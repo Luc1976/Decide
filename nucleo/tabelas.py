@@ -32,6 +32,14 @@ class Organizacao(SQLModel, table=True):
     slug: str = Field(unique=True, index=True)   # identificador curto (ex.: "rua-estudio")
     ativa: bool = Field(default=True)            # desativada = ninguém dela entra
     data_criacao: datetime.datetime = Field(default_factory=_agora)
+    # Assinatura (SaaS). Organizações antigas ficam 'interno' e 'ativa': não têm cobrança.
+    plano: str = Field(default="interno")        # teste, solo, equipe, fundador ou interno
+    assinatura_status: str = Field(default="ativa")  # teste, ativa, pendente, atrasada, cancelada
+    ciclo: Optional[str] = None                  # mensal ou anual
+    teste_fim: Optional[datetime.datetime] = None      # fim do teste grátis (UTC, sem fuso)
+    fidelidade_fim: Optional[datetime.datetime] = None  # fim da fidelidade do plano Fundador
+    asaas_cliente_id: Optional[str] = None
+    asaas_assinatura_id: Optional[str] = None
 
 
 # ---------------------------------------------------------------- usuários e acesso
@@ -47,6 +55,8 @@ class Usuario(SQLModel, table=True):
     # Dono da plataforma: cria e desativa organizações. NÃO dá acesso aos projetos delas.
     superadmin: bool = Field(default=False)
     tema: Optional[str] = None  # "claro" ou "escuro" (vazio = escuro, o padrão)
+    email: Optional[str] = Field(default=None, unique=True, index=True)  # recuperação de senha
+    email_verificado: bool = Field(default=False)
 
 
 class MembroProjeto(SQLModel, table=True):

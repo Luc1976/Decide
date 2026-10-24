@@ -9,8 +9,9 @@ from api.autenticacao import ler_token
 from nucleo.ator import Ator
 from nucleo.db import nova_sessao
 from nucleo.permissoes import organizacao_ativa
+from nucleo.planos import motivo_bloqueio
 from nucleo.servicos.usuarios import MENSAGEM_ORG_DESATIVADA
-from nucleo.tabelas import Usuario
+from nucleo.tabelas import Organizacao, Usuario
 
 _bearer = HTTPBearer(auto_error=False, description="Token obtido em POST /api/v1/auth/login")
 
@@ -38,7 +39,9 @@ def ator_atual(s: Sessao, credenciais: Annotated[HTTPAuthorizationCredentials | 
     if usuario is None:
         raise _nao_autenticado("Usuário não encontrado.")
     if not organizacao_ativa(s, usuario.organizacao_id):
-        raise HTTPException(status.HTTP_403_FORBIDDEN, MENSAGEM_ORG_DESATIVADA)
+        org = s.get(Organizacao, usuario.organizacao_id) if usuario.organizacao_id else None
+        mensagem = motivo_bloqueio(org) if org is not None and org.ativa else MENSAGEM_ORG_DESATIVADA
+        raise HTTPException(status.HTTP_403_FORBIDDEN, mensagem)
     return Ator.de_usuario(usuario)
 
 

@@ -4,12 +4,13 @@ from typing import List, Optional, Tuple
 from sqlmodel import Session, select
 
 from models import NIVEL_PAPEL, PAPEIS
-from nucleo import auditoria
+from nucleo import auditoria, planos
 from nucleo.ator import Ator
 from nucleo.erros import NaoEncontrado, SemPermissao
 from nucleo.permissoes import LEITOR, RESPONSAVEL, exigir, organizacao_ativa
 from nucleo.servicos.documentos import consultar_arquivos
 from nucleo.tabelas import (
+    Organizacao,
     AtaAdendo,
     Caracteristica,
     CaracteristicaHistorico,
@@ -63,6 +64,10 @@ def criar(s: Session, ator: Ator, nome: str, cliente: str, descricao: Optional[s
         raise SemPermissao("Seu usuário não pode criar projetos.")
     if not organizacao_ativa(s, criador.organizacao_id):
         raise SemPermissao("Seu usuário não está ligado a uma organização ativa.")
+    org = s.get(Organizacao, criador.organizacao_id)
+    erro = planos.erro_limite_projeto(org, planos.contar_projetos(s, org.id))
+    if erro:
+        raise SemPermissao(erro)
     projeto = Projeto(nome=nome, cliente=cliente, descricao=(descricao or "").strip() or None,
                       organizacao_id=criador.organizacao_id)
     s.add(projeto)
