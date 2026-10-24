@@ -43,6 +43,10 @@ async def cadastrar_conta(nome_escritorio, nome_completo, email, senha, aceitou)
         return None
     except ValueError as erro:
         return str(erro)
+    except Exception:  # erro inesperado: vai para o log completo (Deploy Logs)
+        log.exception("Falha ao criar conta")
+        return ("Não foi possível criar a conta agora. Tente de novo em instantes; "
+                "se continuar, fale com o suporte.")
 
 
 async def pedir_redefinicao(email):
