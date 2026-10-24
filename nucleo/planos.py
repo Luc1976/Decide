@@ -65,14 +65,17 @@ MENSAGEM_ASSINATURA_CANCELADA = (
 
 
 def agora_utc() -> datetime.datetime:
-    """Horário UTC sem fuso, igual ao que o banco devolve."""
-    return datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+    """Horário atual em UTC, com fuso (o PostgreSQL exige fuso nas colunas de data/hora)."""
+    return datetime.datetime.now(datetime.timezone.utc)
 
 
-def _sem_fuso(valor: Optional[datetime.datetime]) -> Optional[datetime.datetime]:
-    if valor is None or valor.tzinfo is None:
-        return valor
-    return valor.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+def _com_fuso(valor: Optional[datetime.datetime]) -> Optional[datetime.datetime]:
+    """Valor em UTC com fuso. Sem fuso (SQLite ou dado antigo) é tratado como UTC."""
+    if valor is None:
+        return None
+    if valor.tzinfo is None:
+        return valor.replace(tzinfo=datetime.timezone.utc)
+    return valor.astimezone(datetime.timezone.utc)
 
 
 def valor_cobranca(plano: str, ciclo: str) -> float:
@@ -87,8 +90,8 @@ def acesso_liberado(org: Organizacao, agora: Optional[datetime.datetime] = None)
     """Pode a organização usar o app agora? Só regra de assinatura, sem olhar a flag 'ativa'."""
     if org.plano == PLANO_INTERNO or org.assinatura_status == STATUS_ATIVA:
         return True
-    agora = agora or agora_utc()
-    fim_teste = _sem_fuso(org.teste_fim)
+    agora = _com_fuso(agora or agora_utc())
+    fim_teste = _com_fuso(org.teste_fim)
     return org.assinatura_status == STATUS_TESTE and fim_teste is not None and fim_teste > agora
 
 
