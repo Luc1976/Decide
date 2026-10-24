@@ -57,6 +57,7 @@ class Usuario(SQLModel, table=True):
     tema: Optional[str] = None  # "claro" ou "escuro" (vazio = escuro, o padrão)
     email: Optional[str] = Field(default=None, unique=True, index=True)  # recuperação de senha
     email_verificado: bool = Field(default=False)
+    termos_aceitos_em: Optional[datetime.datetime] = None  # aceite dos Termos no cadastro
 
 
 class MembroProjeto(SQLModel, table=True):
@@ -75,6 +76,7 @@ class Projeto(SQLModel, table=True):
     cliente: str
     descricao: Optional[str] = None
     data_criacao: datetime.datetime = Field(default_factory=_agora)
+    arquivado: bool = Field(default=False)  # projeto arquivado sai das listas e não conta no plano
     # Sem organização, o projeto fica inacessível (falha segura). Os serviços sempre preenchem.
     organizacao_id: Optional[int] = Field(default=None, foreign_key="organizacao.id", index=True)
 

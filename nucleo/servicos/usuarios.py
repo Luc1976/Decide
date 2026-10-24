@@ -37,7 +37,9 @@ def autenticar(s: Session, username: str, senha: str) -> Optional[Usuario]:
     if not usuario or not senha_confere(senha or "", usuario.senha):
         return None
     if not organizacao_ativa(s, usuario.organizacao_id):
-        raise SemPermissao(MENSAGEM_ORG_DESATIVADA)
+        org = s.get(Organizacao, usuario.organizacao_id) if usuario.organizacao_id else None
+        raise SemPermissao(planos.motivo_bloqueio(org) if org is not None and org.ativa
+                           else MENSAGEM_ORG_DESATIVADA)
     if not eh_hash(usuario.senha):
         usuario.senha = hash_senha(senha)
         s.add(usuario)
@@ -65,8 +67,9 @@ def novo_usuario(s: Session, username: str, senha: str, nome_completo: str, orga
     org = s.get(Organizacao, organizacao_id)
     if org is None:
         raise ValueError("Organização não encontrada.")
+    cliente = not admin and not pode_criar_projetos  # cliente só acompanha: não conta no plano
     admins, colaboradores = planos.contar_usuarios(s, organizacao_id)
-    erro = planos.erro_limite_usuario(org, admins, colaboradores, novo_admin=admin)
+    erro = planos.erro_limite_usuario(org, admins, colaboradores, novo_admin=admin, novo_cliente=cliente)
     if erro:
         raise ValueError(erro)
     # O login é único na plataforma toda (a pessoa entra só com o usuário).

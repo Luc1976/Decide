@@ -1,11 +1,15 @@
 import asyncio
+import logging
 import math
+from urllib.parse import parse_qsl
 
 import flet as ft
 
 import tema
 
 from database import autenticar_usuario, definir_tema, init_db, listar_projetos_do_usuario, pode_no_projeto
+from nucleo.db import nova_sessao
+from nucleo.servicos import cadastro
 from views.atas import build_atas_view
 from views.documentos import build_documentos_view
 from views.ficha import build_ficha_view
@@ -18,6 +22,49 @@ from seguranca import LimitadorTentativas
 
 # Compartilhado entre todas as sessões: 5 senhas erradas bloqueiam o usuário por 15 min.
 LIMITADOR_LOGIN = LimitadorTentativas(maximo=5, janela_s=900, bloqueio_s=900)
+log = logging.getLogger(__name__)
+
+
+def _confirmar_email_link(token):
+    try:
+        with nova_sessao() as s:
+            cadastro.confirmar_email(s, token)
+        return "E-mail confirmado. Agora é só entrar."
+    except ValueError as erro:
+        return str(erro)
+
+
+async def cadastrar_conta(nome_escritorio, nome_completo, email, senha, aceitou):
+    def fazer():
+        with nova_sessao() as s:
+            cadastro.cadastrar(s, nome_escritorio, nome_completo, email, senha, aceitou)
+    try:
+        await asyncio.to_thread(fazer)  # envia e-mail: não trava a tela
+        return None
+    except ValueError as erro:
+        return str(erro)
+
+
+async def pedir_redefinicao(email):
+    def fazer():
+        with nova_sessao() as s:
+            cadastro.esqueci_senha(s, email)
+    try:
+        await asyncio.to_thread(fazer)
+    except Exception:  # a resposta na tela é a mesma, mesmo com falha
+        log.exception("Falha ao pedir redefinição de senha")
+    return None
+
+
+async def redefinir_senha_link(token, senha):
+    def fazer():
+        with nova_sessao() as s:
+            cadastro.redefinir_com_token(s, token, senha)
+    try:
+        await asyncio.to_thread(fazer)
+        return None
+    except ValueError as erro:
+        return str(erro)
 
 
 def main(page: ft.Page):
@@ -121,7 +168,12 @@ def main(page: ft.Page):
             )
             page.update()
             return
-        usuario = autenticar_usuario(username, senha)
+        try:
+            usuario = autenticar_usuario(username, senha)
+        except PermissionError as erro:  # senha certa, mas assinatura/organização bloqueada
+            mensagem_erro.value = str(erro)
+            page.update()
+            return
         if usuario:
             LIMITADOR_LOGIN.sucesso(chave)
             usuario_logado = usuario
@@ -196,11 +248,21 @@ def main(page: ft.Page):
         projeto_ativo = projeto
 
     def route_change(_):
+        caminho, _, consulta = (page.route or "/login").partition("?")
+        params = dict(parse_qsl(consulta))
         if usuario_logado is None:
-            if page.route != "/login":
+            if caminho != "/login":
                 asyncio.create_task(page.push_route("/login"))
                 return
-            mostrar_view(build_login_view(fazer_login, page))
+            aviso = _confirmar_email_link(params["confirmar"]) if params.get("confirmar") else None
+            mostrar_view(build_login_view(
+                fazer_login, page,
+                on_cadastro=cadastrar_conta,
+                on_esqueci=pedir_redefinicao,
+                on_redefinir=redefinir_senha_link,
+                token_redefinir=params.get("token"),
+                aviso=aviso,
+            ))
         elif page.route == "/plataforma":
             montar_plataforma()  # não depende de projeto; a própria tela confere o superadmin
         elif not garantir_projeto_valido():

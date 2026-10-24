@@ -119,10 +119,11 @@ def _nome_do_plano(org: Organizacao) -> str:
 
 
 def erro_limite_usuario(org: Organizacao, administradores: int, colaboradores: int,
-                        novo_admin: bool) -> Optional[str]:
-    """Mensagem de erro se cadastrar mais um usuário estoura o plano; None se cabe."""
+                        novo_admin: bool, novo_cliente: bool = False) -> Optional[str]:
+    """Mensagem de erro se cadastrar mais um usuário estoura o plano; None se cabe.
+    Clientes (só acompanham projetos) não contam como colaboradores."""
     limites = limites_da_org(org)
-    if limites is None:
+    if limites is None or novo_cliente:
         return None
     if novo_admin and administradores + 1 > limites["administradores"]:
         return (f"O plano {_nome_do_plano(org)} permite {limites['administradores']} "
@@ -143,16 +144,22 @@ def erro_limite_projeto(org: Organizacao, projetos: int) -> Optional[str]:
 
 
 def contar_usuarios(s: Session, organizacao_id: int) -> tuple:
-    """(administradores, colaboradores) da organização."""
+    """(administradores, colaboradores) da organização. Clientes não entram na contagem."""
     from nucleo.tabelas import Usuario
-    usuarios = s.exec(select(Usuario.admin).where(Usuario.organizacao_id == organizacao_id)).all()
-    administradores = sum(1 for admin in usuarios if admin)
-    return administradores, len(usuarios) - administradores
+    linhas = s.exec(
+        select(Usuario.admin, Usuario.pode_criar_projetos).where(Usuario.organizacao_id == organizacao_id)
+    ).all()
+    administradores = sum(1 for admin, _ in linhas if admin)
+    colaboradores = sum(1 for admin, pode in linhas if not admin and pode)
+    return administradores, colaboradores
 
 
 def contar_projetos(s: Session, organizacao_id: int) -> int:
+    """Projetos ativos (não arquivados) da organização."""
     from nucleo.tabelas import Projeto
-    return len(s.exec(select(Projeto.id).where(Projeto.organizacao_id == organizacao_id)).all())
+    return len(s.exec(select(Projeto.id).where(
+        Projeto.organizacao_id == organizacao_id, Projeto.arquivado == False  # noqa: E712
+    )).all())
 
 
 def vagas_fundador_restantes(s: Session) -> int:

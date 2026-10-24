@@ -34,13 +34,15 @@ def _validar(nome: str, cliente: str) -> Tuple[str, str]:
 
 # ---------------------------------------------------------------- leitura
 
-def listar_do_usuario(s: Session, ator: Ator) -> List[Projeto]:
+def listar_do_usuario(s: Session, ator: Ator, incluir_arquivados: bool = False) -> List[Projeto]:
     """Só os projetos que o ator pode ver, sempre dentro da organização dele
-    (o administrador vê todos os projetos DA SUA organização)."""
+    (o administrador vê todos os projetos DA SUA organização). Arquivados ficam de fora."""
     usuario = s.get(Usuario, ator.id) if ator.id is not None else None
     if usuario is None or not organizacao_ativa(s, usuario.organizacao_id):
         return []
     consulta = select(Projeto).where(Projeto.organizacao_id == usuario.organizacao_id)
+    if not incluir_arquivados:
+        consulta = consulta.where(Projeto.arquivado == False)  # noqa: E712 (SQL precisa do ==)
     if not usuario.admin:
         ids = s.exec(select(MembroProjeto.projeto_id).where(MembroProjeto.usuario_id == ator.id)).all()
         if not ids:
@@ -92,6 +94,25 @@ def atualizar(s: Session, ator: Ator, projeto_id: int, nome: str, cliente: str,
     projeto.descricao = (descricao or "").strip() or None
     s.add(projeto)
     auditoria.registrar(s, ator, "projeto.atualizar", projeto_id, "projeto", projeto_id)
+    s.commit()
+    s.refresh(projeto)
+    return projeto
+
+
+def arquivar(s: Session, ator: Ator, projeto_id: int, arquivar: bool = True) -> Projeto:
+    """Arquiva (ou reativa) o projeto. Arquivado: some das listas, fica guardado e não
+    conta no limite do plano. Só o Responsável do projeto ou o administrador faz isso."""
+    exigir(s, ator, projeto_id, RESPONSAVEL)
+    projeto = s.get(Projeto, projeto_id)
+    if not arquivar and projeto.arquivado:
+        org = s.get(Organizacao, projeto.organizacao_id)
+        erro = planos.erro_limite_projeto(org, planos.contar_projetos(s, org.id))
+        if erro:
+            raise SemPermissao("Para reativar este projeto, " + erro[0].lower() + erro[1:])
+    projeto.arquivado = arquivar
+    s.add(projeto)
+    acao = "projeto.arquivar" if arquivar else "projeto.reativar"
+    auditoria.registrar(s, ator, acao, projeto_id, "projeto", projeto_id)
     s.commit()
     s.refresh(projeto)
     return projeto
