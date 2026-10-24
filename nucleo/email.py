@@ -34,7 +34,12 @@ def enviar(destino: str, assunto: str, html: str) -> bool:
     })
     try:
         with urllib.request.urlopen(pedido, timeout=15) as resposta:
+            log.info("E-mail '%s' aceito pelo Resend para %s", assunto, destino)
             return 200 <= resposta.status < 300
+    except urllib.error.HTTPError as erro:  # o Resend explica o motivo no corpo da resposta
+        detalhe = erro.read().decode("utf-8", "replace")[:500]
+        log.error("Resend recusou o e-mail para %s (HTTP %s): %s", destino, erro.code, detalhe)
+        return False
     except (urllib.error.URLError, OSError) as erro:
-        log.error("Falha ao enviar e-mail para %s: %s", destino, erro)
+        log.error("Falha de conexão ao enviar e-mail para %s: %s", destino, erro)
         return False
