@@ -89,7 +89,7 @@ async def redefinir_senha_link(token, senha):
 
 
 def main(page: ft.Page):
-    page.title = "Ru.A Estudio - Memória de Projetos"
+    page.title = "Decidiu - Memória de Projetos"
     tema.configurar(page)  # temas claro e escuro; começa no claro (padrão) até o login
     page.padding = 20
 

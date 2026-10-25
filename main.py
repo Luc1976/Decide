@@ -58,6 +58,9 @@ if MODO_WEB:
         from webhook_asaas import registrar_rota_webhook
 
         registrar_rota_webhook(asgi)
+        from icones_web import registrar_rota_icones
+
+        registrar_rota_icones(asgi)
     except Exception as erro:  # versão do Flet sem export_asgi_app, FastAPI ausente etc.
         print(
             f"[memoria] ERRO ao montar o servidor web: {type(erro).__name__}: {erro}\n"
