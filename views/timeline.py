@@ -16,6 +16,8 @@ import tema
 from database import (
     arquivar_projeto,
     listar_projetos_arquivados,
+    nome_do_escritorio,
+    renomear_escritorio,
     listar_documentos_com_arquivos,
     Reuniao,
     adicionar_decisao,
@@ -543,6 +545,47 @@ def build_timeline_view(
             ft.Button(
                 content="Gerar PDF", icon=ft.Icons.PICTURE_AS_PDF, on_click=gerar_relatorio
             ),
+        ],
+    )
+
+    # ---------- Nome do escritório (administrador da organização) ----------
+    input_nome_escritorio = ft.TextField(label="Nome do escritório", autofocus=True)
+    msg_nome_escritorio = ft.Text("", color=ft.Colors.ERROR, size=12)
+
+    def abrir_nome_escritorio(_):
+        if not usuario.admin:
+            return
+        try:
+            input_nome_escritorio.value = nome_do_escritorio(usuario.id)
+        except (ValueError, PermissionError):
+            input_nome_escritorio.value = ""
+        msg_nome_escritorio.value = ""
+        page.show_dialog(modal_nome_escritorio)
+
+    async def salvar_nome_escritorio(_):
+        try:
+            renomear_escritorio(usuario.id, input_nome_escritorio.value)
+        except (ValueError, PermissionError) as erro:
+            msg_nome_escritorio.value = str(erro)
+            page.update()
+            return
+        page.pop_dialog()
+        page.update()
+
+    modal_nome_escritorio = ft.AlertDialog(
+        **opcoes_dialogo(page),
+        title=ft.Text("Nome do escritório"),
+        content=ft.Container(
+            width=largura_dialogo(page, 420),
+            content=ft.Column(tight=True, controls=[
+                ft.Text("Nome do seu escritório, exibido para os usuários da organização.", size=12),
+                input_nome_escritorio,
+                msg_nome_escritorio,
+            ]),
+        ),
+        actions=[
+            ft.TextButton(content="Cancelar", on_click=lambda _: page.pop_dialog()),
+            ft.Button(content="Salvar", on_click=salvar_nome_escritorio),
         ],
     )
 
@@ -1636,6 +1679,7 @@ def build_timeline_view(
             btn_excluir_projeto,
             _secao("ADMINISTRAÇÃO", visivel=bool(usuario.admin or eh_superadmin)),
             _item(ft.Icons.GROUP_ADD_OUTLINED, "Usuários da organização", abrir_usuarios, visivel=bool(usuario.admin)),
+            _item(ft.Icons.EDIT_OUTLINED, "Nome do escritório", abrir_nome_escritorio, visivel=bool(usuario.admin)),
             _item(ft.Icons.BUSINESS, "Logo da empresa (PDFs)", abrir_logo_empresa, visivel=bool(usuario.admin)),
             _item(ft.Icons.DOMAIN, "Plataforma: organizações", on_open_plataforma or (lambda _: None),
                   visivel=eh_superadmin),

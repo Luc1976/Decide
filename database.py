@@ -250,6 +250,16 @@ def listar_projetos_do_usuario(usuario_id: int) -> List[Projeto]:
         return s_projetos.listar_do_usuario(s, _ator(s, usuario_id))
 
 
+def nome_do_escritorio(usuario_id: int) -> str:
+    with nova_sessao() as s:
+        return s_organizacoes.minha(s, _ator(s, usuario_id)).nome
+
+
+def renomear_escritorio(usuario_id: int, nome: str) -> None:
+    with nova_sessao() as s:
+        s_organizacoes.renomear(s, _ator(s, usuario_id), nome)
+
+
 def arquivar_projeto(projeto_id: int, usuario_id: int, arquivar: bool = True) -> None:
     with nova_sessao() as s:
         s_projetos.arquivar(s, _ator(s, usuario_id), projeto_id, arquivar)
