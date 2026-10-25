@@ -25,6 +25,15 @@ def _base() -> str:
     return "https://api-sandbox.asaas.com/v3" if sandbox else "https://api.asaas.com/v3"
 
 
+def _motivo_asaas(detalhe: str) -> str:
+    """Mensagem de validação que o Asaas devolve no corpo do erro (ex.: CPF inválido)."""
+    try:
+        erros = json.loads(detalhe).get("errors") or []
+        return "; ".join(e.get("description", "") for e in erros if e.get("description"))
+    except (ValueError, AttributeError):
+        return ""
+
+
 def _chamar(metodo: str, caminho: str, corpo: Optional[dict] = None) -> dict:
     chave = (os.getenv("ASAAS_API_KEY") or "").strip()
     if not chave:
@@ -41,7 +50,9 @@ def _chamar(metodo: str, caminho: str, corpo: Optional[dict] = None) -> dict:
     except urllib.error.HTTPError as erro:
         detalhe = erro.read().decode("utf-8", "replace")[:500]
         log.error("Asaas recusou %s %s (HTTP %s): %s", metodo, caminho, erro.code, detalhe)
-        raise ErroAsaas("O Asaas recusou o pedido. Confira os dados e tente de novo.") from erro
+        motivo = _motivo_asaas(detalhe)
+        mensagem = "O Asaas recusou o pedido" + (f": {motivo}" if motivo else ". Confira os dados e tente de novo.")
+        raise ErroAsaas(mensagem) from erro
     except (urllib.error.URLError, OSError) as erro:
         log.error("Falha de conexão com o Asaas em %s: %s", caminho, erro)
         raise ErroAsaas("Não foi possível falar com o Asaas agora. Tente em alguns minutos.") from erro
