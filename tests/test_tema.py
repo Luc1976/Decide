@@ -57,9 +57,9 @@ def test_telas_sem_cores_fixas_de_paleta():
             assert not fixa or cor in permitidas, f"{arquivo.name}: ft.Colors.{cor}"
 
 
-def test_preferencia_vazia_e_escuro():
+def test_preferencia_vazia_e_claro():
     pagina = _pagina(None)
-    assert tema.modo_atual(pagina) == tema.ESCURO
+    assert tema.modo_atual(pagina) == tema.CLARO
     tema.aplicar_modo(pagina, "claro")
     assert pagina.theme_mode == ft.ThemeMode.LIGHT and tema.oposto("claro") == "escuro"
 
