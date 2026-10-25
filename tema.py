@@ -19,7 +19,7 @@ import flet as ft
 
 CLARO, ESCURO = "claro", "escuro"
 MODOS = (CLARO, ESCURO)
-MODO_PADRAO = ESCURO  # como o app sempre foi
+MODO_PADRAO = CLARO  # padrão: claro; quem preferir o escuro troca no menu e fica salvo
 
 COR_BASE = "#2F5DA8"  # azul do Decidiu: o Flet gera toda a paleta a partir dela
 

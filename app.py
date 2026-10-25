@@ -90,7 +90,7 @@ async def redefinir_senha_link(token, senha):
 
 def main(page: ft.Page):
     page.title = "Ru.A Estudio - Memória de Projetos"
-    tema.configurar(page)  # temas claro e escuro; começa no escuro até o login
+    tema.configurar(page)  # temas claro e escuro; começa no claro (padrão) até o login
     page.padding = 20
 
     init_db()
@@ -198,7 +198,7 @@ def main(page: ft.Page):
         if usuario:
             LIMITADOR_LOGIN.sucesso(chave)
             usuario_logado = usuario
-            tema.aplicar_modo(page, usuario.tema)  # modo escolhido por ele (padrão: escuro)
+            tema.aplicar_modo(page, usuario.tema)  # modo escolhido por ele (padrão: claro)
             projetos = listar_projetos_do_usuario(usuario.id)
             projeto_ativo = projetos[0] if projetos else None
             await page.push_route("/timeline")
