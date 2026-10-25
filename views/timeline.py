@@ -1099,10 +1099,10 @@ def build_timeline_view(
         value="Médio",
     )
     input_descricao = ft.TextField(
-        label="O que foi decidido?", multiline=True, min_lines=2
+        label="O que foi decidido?", multiline=True, min_lines=6, max_lines=18, expand=True
     )
     input_justificativa = ft.TextField(
-        label="Justificativa", multiline=True, min_lines=2
+        label="Justificativa", multiline=True, min_lines=6, max_lines=18, expand=True
     )
     input_nova_tarefa = ft.TextField(
         label="Adicionar item ao checklist", expand=True

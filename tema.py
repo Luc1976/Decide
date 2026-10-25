@@ -94,6 +94,13 @@ CORES_CATEGORIA = {
     "instalações": ("#FFB74D", "#E65100"),
     "Orçamento": ("#CE93D8", "#7B1FA2"),
     "Geral": ("#BDBDBD", "#616161"),
+    "Elétrica": ("#FFE082", "#F9A825"),
+    "Hidrossanitário": ("#81D4FA", "#0277BD"),
+    "HVAC": ("#C5E1A5", "#558B2F"),
+    "PPCI": ("#FFAB91", "#D84315"),
+    "Arquitetura de Interiores": ("#F8BBD0", "#AD1457"),
+    "Urbanismo": ("#D1C4E9", "#4527A0"),
+    "Fundações": ("#D7CCC8", "#5D4037"),
 }
 CORES_IMPACTO = {"Alto": "#EF9A9A", "Médio": "#FFD54F", "Baixo": "#81C784"}
 CORES_SITUACAO = {

@@ -1,6 +1,19 @@
 """Opções de domínio usadas na memória de decisões."""
 
-CATEGORIAS = ("Arquitetura", "Estrutura", "instalações", "Orçamento", "Geral")
+CATEGORIAS = (
+    "Arquitetura",
+    "Arquitetura de Interiores",
+    "Estrutura",
+    "Fundações",
+    "instalações",
+    "Elétrica",
+    "Hidrossanitário",
+    "HVAC",
+    "PPCI",
+    "Urbanismo",
+    "Orçamento",
+    "Geral",
+)
 IMPACTOS = ("Alto", "Médio", "Baixo")
 
 
