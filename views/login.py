@@ -2,16 +2,17 @@ import flet as ft
 from marca import marca_login
 
 from layout import compacto, largura_campo
+from nucleo.legal import url_termos
+from views.planos import texto_termos
 
 
 def build_login_view(on_login, page=None, on_cadastro=None, on_esqueci=None, on_redefinir=None,
-                     token_redefinir=None, aviso=None, on_assinar=None):
+                     token_redefinir=None, aviso=None):
     """Tela de entrada com quatro modos: entrar, criar conta, esqueci a senha e nova senha.
 
     on_cadastro(nome_escritorio, nome_completo, email, senha, aceitou) -> erro (str) ou None.
     on_esqueci(email) -> None (a resposta é sempre a mesma).
     on_redefinir(token, nova_senha) -> erro (str) ou None.
-    on_assinar(usuario, senha, plano, ciclo, cpf_cnpj) -> (link, erro).
     """
     # No celular o cartão ocupa a tela toda (menos margens); no computador mantém 400 px.
     largura_cartao = largura_campo(page, 400) if page is not None else 400
@@ -33,13 +34,17 @@ def build_login_view(on_login, page=None, on_cadastro=None, on_esqueci=None, on_
     async def fazer_login(_):
         await on_login(input_user.value, input_senha.value, msg)
 
+    async def ir_planos(_):
+        if page is not None:
+            await page.push_route("/planos")
+
     entrar = [
         input_user,
         input_senha,
         ft.Button(content="Entrar", width=largura, on_click=fazer_login),
         ft.TextButton(content="Criar conta grátis (30 dias)", on_click=lambda _: mostrar("cadastro")),
         ft.TextButton(content="Esqueci minha senha", on_click=lambda _: mostrar("esqueci")),
-        ft.TextButton(content="Assinar um plano", on_click=lambda _: mostrar("assinar")),
+        ft.TextButton(content="Ver planos e assinar", on_click=ir_planos),
     ]
 
     # ---------------- criar conta
@@ -71,6 +76,7 @@ def build_login_view(on_login, page=None, on_cadastro=None, on_esqueci=None, on_
 
     cadastro = [
         c_escritorio, c_nome, c_email, c_senha, c_senha2, c_termos,
+        texto_termos(url_termos(), prefixo="Leia os "),
         ft.Button(content="Começar teste grátis de 30 dias", width=largura, on_click=criar_conta),
         ft.TextButton(content="Já tenho conta", on_click=lambda _: mostrar("entrar")),
     ]
@@ -114,45 +120,7 @@ def build_login_view(on_login, page=None, on_cadastro=None, on_esqueci=None, on_
         ft.TextButton(content="Voltar para entrar", on_click=lambda _: mostrar("entrar")),
     ]
 
-    # ---------------- assinar um plano (funciona também com a conta bloqueada pelo vencimento)
-    s_user = ft.TextField(label="Usuário ou e-mail do administrador", width=largura, prefix_icon=ft.Icons.PERSON)
-    s_senha = ft.TextField(label="Senha", width=largura, password=True, can_reveal_password=True,
-                           prefix_icon=ft.Icons.LOCK)
-    s_cpf = ft.TextField(label="CPF ou CNPJ do responsável", width=largura, prefix_icon=ft.Icons.DESCRIPTION)
-    link_txt = ft.Text("", selectable=True, size=12)
-
-    async def escolher_plano(plano, ciclo):
-        if not all([s_user.value, s_senha.value, s_cpf.value]):
-            msg.value = "Preencha usuário, senha e CPF ou CNPJ."
-            link_txt.value = ""
-            return atualizar()
-        link, erro = await on_assinar(s_user.value, s_senha.value, plano, ciclo, s_cpf.value)
-        if erro:
-            msg.value = erro
-            link_txt.value = ""
-            return atualizar()
-        msg.value = ""
-        link_txt.value = ("Pague pelo link abaixo. Depois da confirmação, o acesso é liberado "
-                          "automaticamente:\n" + link)
-        atualizar()
-
-    def _botao_plano(texto, plano, ciclo):
-        async def clique(_):
-            await escolher_plano(plano, ciclo)
-        return ft.Button(content=texto, width=largura, on_click=clique)
-
-    assinar = [
-        s_user, s_senha, s_cpf,
-        _botao_plano("Solo — mensal, R$ 29", "solo", "mensal"),
-        _botao_plano("Solo — anual, R$ 290 (2 meses grátis)", "solo", "anual"),
-        _botao_plano("Equipe — mensal, R$ 79", "equipe", "mensal"),
-        _botao_plano("Equipe — anual, R$ 790 (2 meses grátis)", "equipe", "anual"),
-        _botao_plano("Fundador — R$ 49/mês, fidelidade de 12 meses (vagas limitadas)", "fundador", "mensal"),
-        link_txt,
-        ft.TextButton(content="Voltar para entrar", on_click=lambda _: mostrar("entrar")),
-    ]
-
-    modos = {"entrar": entrar, "cadastro": cadastro, "esqueci": esqueci, "nova": nova, "assinar": assinar}
+    modos = {"entrar": entrar, "cadastro": cadastro, "esqueci": esqueci, "nova": nova}
     corpo = ft.Column(tight=True, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=14)
 
     def mostrar(modo: str, texto_aviso=None):

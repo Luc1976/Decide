@@ -9,7 +9,10 @@ import tema
 
 from database import autenticar_usuario, definir_tema, init_db, listar_projetos_do_usuario, pode_no_projeto
 from nucleo.db import nova_sessao
+from nucleo import planos as regras_planos
+from nucleo.legal import url_termos
 from nucleo.servicos import assinaturas, cadastro
+from views.planos import build_planos_view
 from views.atas import build_atas_view
 from views.documentos import build_documentos_view
 from views.ficha import build_ficha_view
@@ -269,6 +272,22 @@ def main(page: ft.Page):
         caminho, _, consulta = (page.route or "/login").partition("?")
         params = dict(parse_qsl(consulta))
         if usuario_logado is None:
+            if caminho == "/planos":
+                try:
+                    with nova_sessao() as s:
+                        vagas = regras_planos.vagas_fundador_restantes(s)
+                except Exception:
+                    vagas = None
+
+                async def voltar_login():
+                    await page.push_route("/login")
+
+                mostrar_view(build_planos_view(
+                    page, gerar_link_assinatura,
+                    lambda: asyncio.create_task(voltar_login()),
+                    url_termos=url_termos(), vagas_fundador=vagas,
+                ))
+                return
             if caminho != "/login":
                 asyncio.create_task(page.push_route("/login"))
                 return
@@ -278,7 +297,6 @@ def main(page: ft.Page):
                 on_cadastro=cadastrar_conta,
                 on_esqueci=pedir_redefinicao,
                 on_redefinir=redefinir_senha_link,
-                on_assinar=gerar_link_assinatura,
                 token_redefinir=params.get("token"),
                 aviso=aviso,
             ))
