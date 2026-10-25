@@ -250,6 +250,17 @@ def listar_projetos_do_usuario(usuario_id: int) -> List[Projeto]:
         return s_projetos.listar_do_usuario(s, _ator(s, usuario_id))
 
 
+def arquivar_projeto(projeto_id: int, usuario_id: int, arquivar: bool = True) -> None:
+    with nova_sessao() as s:
+        s_projetos.arquivar(s, _ator(s, usuario_id), projeto_id, arquivar)
+
+
+def listar_projetos_arquivados(usuario_id: int) -> List[Projeto]:
+    with nova_sessao() as s:
+        ator = _ator(s, usuario_id)
+        return [p for p in s_projetos.listar_do_usuario(s, ator, incluir_arquivados=True) if p.arquivado]
+
+
 def criar_projeto(nome: str, cliente: str, descricao: Optional[str] = None,
                   criador_id: Optional[int] = None) -> Projeto:
     with nova_sessao() as s:

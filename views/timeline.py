@@ -14,6 +14,8 @@ import flet as ft
 
 import tema
 from database import (
+    arquivar_projeto,
+    listar_projetos_arquivados,
     listar_documentos_com_arquivos,
     Reuniao,
     adicionar_decisao,
@@ -542,6 +544,74 @@ def build_timeline_view(
                 content="Gerar PDF", icon=ft.Icons.PICTURE_AS_PDF, on_click=gerar_relatorio
             ),
         ],
+    )
+
+    # ---------- Arquivar e reativar projetos (Responsável ou administrador) ----------
+    def _aviso(titulo, texto):
+        page.show_dialog(ft.AlertDialog(
+            **opcoes_dialogo(page),
+            title=ft.Text(titulo),
+            content=ft.Text(texto),
+            actions=[ft.TextButton(content="Fechar", on_click=lambda _: page.pop_dialog())],
+        ))
+
+    def arquivar_projeto_atual(_):
+        if nivel < NIVEL_PAPEL["Responsável"]:
+            return
+        try:
+            arquivar_projeto(projeto.id, usuario.id, True)
+        except (ValueError, PermissionError) as erro:
+            _aviso("Não foi possível arquivar", str(erro))
+            return
+        if on_project_deleted:  # sai do projeto arquivado e vai para outro
+            on_project_deleted()
+
+    lista_arquivados = ft.Column(tight=True, scroll=ft.ScrollMode.AUTO)
+    msg_arquivados = ft.Text("", color=ft.Colors.ERROR, size=12)
+
+    def atualizar_lista_arquivados():
+        try:
+            arquivados = listar_projetos_arquivados(usuario.id)
+        except (ValueError, PermissionError):
+            arquivados = []
+        lista_arquivados.controls = [
+            ft.Row([
+                ft.Text(p.nome, expand=True),
+                ft.TextButton(content="Reativar", on_click=lambda _, pid=p.id: reativar_projeto(pid)),
+            ]) for p in arquivados
+        ] or [ft.Text("Nenhum projeto arquivado.")]
+        page.update()
+
+    def reativar_projeto(projeto_id):
+        msg_arquivados.value = ""
+        try:
+            arquivar_projeto(projeto_id, usuario.id, False)
+        except (ValueError, PermissionError) as erro:
+            msg_arquivados.value = str(erro)
+        atualizar_lista_arquivados()
+
+    def abrir_arquivados(_):
+        msg_arquivados.value = ""
+        try:
+            arquivados = listar_projetos_arquivados(usuario.id)
+        except (ValueError, PermissionError):
+            arquivados = []
+        lista_arquivados.controls = [
+            ft.Row([
+                ft.Text(p.nome, expand=True),
+                ft.TextButton(content="Reativar", on_click=lambda _, pid=p.id: reativar_projeto(pid)),
+            ]) for p in arquivados
+        ] or [ft.Text("Nenhum projeto arquivado.")]
+        page.show_dialog(modal_arquivados)
+
+    modal_arquivados = ft.AlertDialog(
+        **opcoes_dialogo(page),
+        title=ft.Text("Projetos arquivados"),
+        content=ft.Container(
+            width=largura_dialogo(page, 500),
+            content=ft.Column(tight=True, controls=[lista_arquivados, msg_arquivados]),
+        ),
+        actions=[ft.TextButton(content="Fechar", on_click=lambda _: page.pop_dialog())],
     )
 
     # ---------- Excluir projeto (Responsável ou administrador) ----------
@@ -1500,6 +1570,8 @@ def build_timeline_view(
     btn_editar_projeto = _item(ft.Icons.EDIT_OUTLINED, "Editar projeto", abrir_edicao_projeto)
     btn_membros = _item(ft.Icons.PEOPLE_OUTLINE, "Membros e acessos", abrir_membros)
     btn_excluir_projeto = _item(ft.Icons.DELETE_OUTLINE, "Excluir projeto", abrir_exclusao_projeto, cor=ft.Colors.ERROR)
+    btn_arquivar_projeto = _item(ft.Icons.ARCHIVE_OUTLINED, "Arquivar projeto", arquivar_projeto_atual)
+    btn_arquivados = _item(ft.Icons.UNARCHIVE_OUTLINED, "Projetos arquivados", abrir_arquivados)
     secao_gestao = _secao("GESTÃO DO PROJETO")
 
     # ------------------------------------------------------------------ ações principais
@@ -1516,8 +1588,11 @@ def build_timeline_view(
         btn_editar_projeto.visible = nivel >= NIVEL_PAPEL["Responsável"]
         btn_membros.visible = nivel >= NIVEL_PAPEL["Responsável"]
         btn_excluir_projeto.visible = nivel >= NIVEL_PAPEL["Responsável"]
+        btn_arquivar_projeto.visible = nivel >= NIVEL_PAPEL["Responsável"]
+        btn_arquivados.visible = nivel >= NIVEL_PAPEL["Responsável"]
         secao_gestao.visible = any(
-            b.visible for b in (btn_novo_projeto, btn_editar_projeto, btn_membros, btn_excluir_projeto)
+            b.visible for b in (btn_novo_projeto, btn_editar_projeto, btn_membros, btn_excluir_projeto,
+                                btn_arquivar_projeto, btn_arquivados)
         )
         btn_nova_decisao.visible = nivel >= NIVEL_PAPEL["Editor"]
         atualizar_botao_pendencias()
@@ -1556,6 +1631,8 @@ def build_timeline_view(
             btn_novo_projeto,
             btn_editar_projeto,
             btn_membros,
+            btn_arquivar_projeto,
+            btn_arquivados,
             btn_excluir_projeto,
             _secao("ADMINISTRAÇÃO", visivel=bool(usuario.admin or eh_superadmin)),
             _item(ft.Icons.GROUP_ADD_OUTLINED, "Usuários da organização", abrir_usuarios, visivel=bool(usuario.admin)),

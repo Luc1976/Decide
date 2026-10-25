@@ -9,7 +9,7 @@ import tema
 
 from database import autenticar_usuario, definir_tema, init_db, listar_projetos_do_usuario, pode_no_projeto
 from nucleo.db import nova_sessao
-from nucleo.servicos import cadastro
+from nucleo.servicos import assinaturas, cadastro
 from views.atas import build_atas_view
 from views.documentos import build_documentos_view
 from views.ficha import build_ficha_view
@@ -58,6 +58,20 @@ async def pedir_redefinicao(email):
     except Exception:  # a resposta na tela é a mesma, mesmo com falha
         log.exception("Falha ao pedir redefinição de senha")
     return None
+
+
+async def gerar_link_assinatura(username, senha, plano, ciclo, cpf_cnpj):
+    """Devolve (link_de_pagamento, None) ou (None, mensagem de erro)."""
+    def fazer():
+        with nova_sessao() as s:
+            return assinaturas.assinar_com_senha(s, username, senha, plano, ciclo, cpf_cnpj)
+    try:
+        return await asyncio.to_thread(fazer), None
+    except ValueError as erro:  # inclui ErroAsaas: a mensagem já é para o usuário
+        return None, str(erro)
+    except Exception:
+        log.exception("Falha ao gerar link de assinatura")
+        return None, "Não foi possível gerar o pagamento agora. Tente de novo ou fale com o suporte."
 
 
 async def redefinir_senha_link(token, senha):
@@ -264,6 +278,7 @@ def main(page: ft.Page):
                 on_cadastro=cadastrar_conta,
                 on_esqueci=pedir_redefinicao,
                 on_redefinir=redefinir_senha_link,
+                on_assinar=gerar_link_assinatura,
                 token_redefinir=params.get("token"),
                 aviso=aviso,
             ))
