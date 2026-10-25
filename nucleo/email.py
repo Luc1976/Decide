@@ -1,7 +1,7 @@
 """E-mails transacionais pelo Resend (confirmação de cadastro e recuperação de senha).
 
 Usa a variável RESEND_API_KEY (no Railway). Sem a chave, nada é enviado e o erro vai para o log.
-O remetente é o domínio verificado no Resend (noreply.decidiu.com), ou MEMORIA_EMAIL_REMETENTE.
+O remetente é o domínio verificado no Resend (noreply.decidiu.app), ou MEMORIA_EMAIL_REMETENTE.
 """
 import json
 import logging
@@ -9,7 +9,7 @@ import os
 import urllib.error
 import urllib.request
 
-REMETENTE_PADRAO = "Decidiu <noreply@noreply.decidiu.com>"
+REMETENTE_PADRAO = "Decidiu <noreply@noreply.decidiu.app>"
 URL_API = "https://api.resend.com/emails"
 
 log = logging.getLogger(__name__)
