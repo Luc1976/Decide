@@ -13,6 +13,7 @@ from urllib.parse import quote
 import flet as ft
 
 import tema
+from eventos import eh_admin
 from database import (
     arquivar_projeto,
     listar_projetos_arquivados,
@@ -155,6 +156,7 @@ def build_timeline_view(
     on_project_deleted=None,
     on_open_pendencias=None,
     on_open_plataforma=None,
+    on_open_painel=None,
     on_trocar_tema=None,
 ):
     # O FilePicker é um "service" e pertence à View: é passado em ft.View(services=[...])
@@ -1683,6 +1685,8 @@ def build_timeline_view(
             _item(ft.Icons.BUSINESS, "Logo da empresa (PDFs)", abrir_logo_empresa, visivel=bool(usuario.admin)),
             _item(ft.Icons.DOMAIN, "Plataforma: organizações", on_open_plataforma or (lambda _: None),
                   visivel=eh_superadmin),
+            _item(ft.Icons.ANALYTICS, "Painel de adesões", on_open_painel or (lambda _: None),
+                  visivel=bool(on_open_painel and eh_admin(usuario.email or usuario.username))),
             ft.Divider(),
             *(
                 [_item(

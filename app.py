@@ -9,9 +9,11 @@ import tema
 
 from database import autenticar_usuario, definir_tema, init_db, listar_projetos_do_usuario, pode_no_projeto
 from nucleo.db import nova_sessao
+from eventos import TipoEvento, eh_admin, registrar_evento
 from nucleo import planos as regras_planos
 from nucleo.legal import url_termos
 from nucleo.servicos import assinaturas, cadastro
+from views.admin import painel_admin
 from views.planos import build_planos_view
 from views.atas import build_atas_view
 from views.documentos import build_documentos_view
@@ -40,7 +42,9 @@ def _confirmar_email_link(token):
 async def cadastrar_conta(nome_escritorio, nome_completo, email, senha, aceitou):
     def fazer():
         with nova_sessao() as s:
-            cadastro.cadastrar(s, nome_escritorio, nome_completo, email, senha, aceitou)
+            usuario = cadastro.cadastrar(s, nome_escritorio, nome_completo, email, senha, aceitou)
+        registrar_evento(TipoEvento.CADASTRO, usuario_id=usuario.id, usuario_email=usuario.email)
+        registrar_evento(TipoEvento.TRIAL_INICIADO, usuario_id=usuario.id)
     try:
         await asyncio.to_thread(fazer)  # envia e-mail: não trava a tela
         return None
@@ -120,6 +124,7 @@ def main(page: ft.Page):
                 abrir_pendencias,
                 abrir_plataforma,
                 trocar_tema,
+                on_open_painel=abrir_painel,
             )
         )
 
@@ -243,6 +248,9 @@ def main(page: ft.Page):
     async def abrir_plataforma(_=None):
         await page.push_route("/plataforma")
 
+    async def abrir_painel(_=None):
+        await page.push_route("/painel")
+
     async def voltar_timeline(_=None):
         await page.push_route("/timeline")
 
@@ -302,6 +310,14 @@ def main(page: ft.Page):
             ))
         elif page.route == "/plataforma":
             montar_plataforma()  # não depende de projeto; a própria tela confere o superadmin
+        elif page.route == "/painel":
+            # Não depende de projeto. A checagem de administrador é feita dentro de painel_admin.
+            mostrar_view(ft.View(
+                route="/painel",
+                scroll=ft.ScrollMode.AUTO,
+                controls=[painel_admin(page, usuario_logado.id,
+                                       usuario_logado.email or usuario_logado.username)],
+            ))
         elif not garantir_projeto_valido():
             mostrar_view(
                 build_sem_projeto_view(page, usuario_logado, sair, projeto_criado)

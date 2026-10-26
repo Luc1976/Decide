@@ -110,18 +110,20 @@ def _organizacao_da_assinatura(s: Session, assinatura_id: Optional[str]) -> Opti
     return s.exec(select(Organizacao).where(Organizacao.asaas_assinatura_id == assinatura_id)).first()
 
 
-def processar_evento(s: Session, evento: dict) -> bool:
-    """Aplica um aviso do Asaas. Devolve True se alguma organização foi atualizada."""
+def processar_evento(s: Session, evento: dict) -> Optional[dict]:
+    """Aplica um aviso do Asaas. Devolve None se nada mudou, ou um dicionário com a transição
+    ('ativada' só na primeira vez que a organização passa a ativa, 'cancelada', 'atrasada')."""
     tipo = evento.get("event")
     if tipo in EVENTOS_PAGOS + EVENTOS_ATRASO:
         assinatura_id = (evento.get("payment") or {}).get("subscription")
     elif tipo in EVENTOS_CANCELAMENTO:
         assinatura_id = (evento.get("subscription") or {}).get("id")
     else:
-        return False
+        return None
     org = _organizacao_da_assinatura(s, assinatura_id)
     if org is None:
-        return False
+        return None
+    anterior = org.assinatura_status
     if tipo in EVENTOS_PAGOS:
         org.assinatura_status = planos.STATUS_ATIVA
     elif tipo in EVENTOS_ATRASO:
@@ -130,4 +132,8 @@ def processar_evento(s: Session, evento: dict) -> bool:
         org.assinatura_status = planos.STATUS_CANCELADA
     s.add(org)
     s.commit()
-    return True
+    if org.assinatura_status == planos.STATUS_ATIVA and anterior != planos.STATUS_ATIVA:
+        return {"transicao": "ativada", "organizacao_id": org.id}
+    if org.assinatura_status == planos.STATUS_CANCELADA and anterior != planos.STATUS_CANCELADA:
+        return {"transicao": "cancelada", "organizacao_id": org.id}
+    return {"transicao": "mantida", "organizacao_id": org.id}

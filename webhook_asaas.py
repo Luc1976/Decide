@@ -33,9 +33,15 @@ def registrar_rota_webhook(app) -> None:
             with nova_sessao() as s:
                 return assinaturas.processar_evento(s, evento)
 
-        processado = await asyncio.to_thread(processar)
-        log.info("Asaas: evento %s processado=%s", evento.get("event"), processado)
-        return {"recebido": True, "processado": processado}
+        resultado = await asyncio.to_thread(processar)
+        log.info("Asaas: evento %s resultado=%s", evento.get("event"), resultado)
+        if resultado and resultado["transicao"] in ("ativada", "cancelada"):
+            from eventos import TipoEvento, registrar_evento
+
+            tipo = (TipoEvento.ASSINATURA_ATIVADA if resultado["transicao"] == "ativada"
+                    else TipoEvento.ASSINATURA_CANCELADA)
+            registrar_evento(tipo, detalhes={"organizacao_id": resultado["organizacao_id"]})
+        return {"recebido": True, "processado": resultado is not None}
 
     app.add_api_route(CAMINHO, receber, methods=["POST"], include_in_schema=False)
     app.router.routes.insert(0, app.router.routes.pop())

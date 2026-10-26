@@ -14,6 +14,7 @@ from typing import List, Optional
 
 from sqlmodel import Session, select
 
+from eventos import TipoEvento, registrar_evento
 from nucleo.ator import Ator
 from nucleo.db import engine, nova_sessao
 from nucleo.marcacoes import extrair_decisoes, extrair_pendencias  # noqa: F401  (reexportadas)
@@ -173,9 +174,15 @@ def autenticar_usuario(username: str, senha: str) -> Optional[Usuario]:
     """None se a senha não confere OU se a organização do usuário está desativada."""
     with nova_sessao() as s:
         try:
-            return s_usuarios.autenticar(s, username, senha)
+            usuario = s_usuarios.autenticar(s, username, senha)
         except PermissionError:
-            return None
+            usuario = None
+    if usuario is not None:
+        registrar_evento(TipoEvento.LOGIN, usuario_id=usuario.id,
+                         usuario_email=usuario.email or usuario.username)
+    else:
+        registrar_evento(TipoEvento.LOGIN_FALHOU, usuario_email=username)
+    return usuario
 
 
 def criar_usuario(username: str, senha: str, nome_completo: str, admin: bool = False,
@@ -274,7 +281,9 @@ def listar_projetos_arquivados(usuario_id: int) -> List[Projeto]:
 def criar_projeto(nome: str, cliente: str, descricao: Optional[str] = None,
                   criador_id: Optional[int] = None) -> Projeto:
     with nova_sessao() as s:
-        return s_projetos.criar(s, _ator(s, criador_id), nome, cliente, descricao)
+        projeto = s_projetos.criar(s, _ator(s, criador_id), nome, cliente, descricao)
+    registrar_evento(TipoEvento.PROJETO_CRIADO, usuario_id=criador_id, projeto_id=projeto.id)
+    return projeto
 
 
 def atualizar_projeto(projeto_id: int, nome: str, cliente: str, descricao: Optional[str] = None,
@@ -338,6 +347,7 @@ def adicionar_decisao(projeto_id, titulo, categoria, descricao, justificativa, a
     )
     with nova_sessao() as s:
         s_decisoes.criar(s, _ator(s, usuario_id, autor), projeto_id, dados, verificar_anexos=False)
+    registrar_evento(TipoEvento.DECISAO_CRIADA, usuario_id=usuario_id, projeto_id=projeto_id)
 
 
 def listar_decisoes_projeto(projeto_id: int) -> List[Decisao]:
@@ -361,7 +371,9 @@ def anexo_pertence_ao_projeto(projeto_id: int, caminho: str) -> bool:
 def criar_reuniao(projeto_id: int, titulo: str, data_reuniao: datetime.date, participantes: str,
                   texto: str, autor: str, usuario_id: Optional[int] = None) -> Reuniao:
     with nova_sessao() as s:
-        return s_atas.criar(s, _ator(s, usuario_id, autor), projeto_id, titulo, data_reuniao, participantes, texto)
+        reuniao = s_atas.criar(s, _ator(s, usuario_id, autor), projeto_id, titulo, data_reuniao, participantes, texto)
+    registrar_evento(TipoEvento.ATA_CRIADA, usuario_id=usuario_id, projeto_id=projeto_id)
+    return reuniao
 
 
 def atualizar_reuniao_rascunho(reuniao_id: int, titulo: str, data_reuniao: datetime.date,
