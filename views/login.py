@@ -127,7 +127,6 @@ def build_login_view(on_login, page=None, on_cadastro=None, on_esqueci=None, on_
         corpo.controls = modos[modo]
         aviso_txt.value = texto_aviso or ""
         msg.value = ""
-        link_txt.value = ""
         atualizar()
 
     inicial = "nova" if token_redefinir and on_redefinir else "entrar"
