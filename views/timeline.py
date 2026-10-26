@@ -156,8 +156,8 @@ def build_timeline_view(
     on_project_deleted=None,
     on_open_pendencias=None,
     on_open_plataforma=None,
-    on_open_painel=None,
     on_trocar_tema=None,
+    on_open_painel=None,
 ):
     # O FilePicker é um "service" e pertence à View: é passado em ft.View(services=[...])
     # no return. NÃO use page.services aqui, pois ele exige que page.views não esteja vazia.
