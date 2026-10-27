@@ -41,6 +41,8 @@ class Organizacao(SQLModel, table=True):
     fidelidade_fim: Optional[datetime.datetime] = None  # fim da fidelidade do plano Fundador
     asaas_cliente_id: Optional[str] = None
     asaas_assinatura_id: Optional[str] = None
+    asaas_link_id: Optional[str] = None         # plano anual: link de pagamento parcelável
+    asaas_link_url: Optional[str] = None
 
 
 # ---------------------------------------------------------------- usuários e acesso

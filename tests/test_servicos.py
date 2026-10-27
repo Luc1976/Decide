@@ -211,3 +211,30 @@ def test_fechar_ata_recusa_decisao_sem_disciplina_ou_impacto(s, cenario):
     assert ata.status == "Rascunho"
     prev = atas.pre_visualizar(s, bia, p, "[D] Só texto")
     assert prev["erros_decisoes"] and "disciplina" in prev["erros_decisoes"][0]
+
+
+def test_pagamento_do_link_anual_ativa_e_abre_12_meses(s):
+    from nucleo import planos
+    from nucleo.servicos import assinaturas
+    from nucleo.tabelas import Organizacao
+
+    org = Organizacao(nome="Anual", slug="anual-teste", plano=planos.PLANO_SOLO,
+                      assinatura_status=planos.STATUS_PENDENTE, ciclo=planos.CICLO_ANUAL,
+                      asaas_link_id="lnk_teste")
+    s.add(org)
+    s.commit()
+    transicao = assinaturas.processar_evento(s, {
+        "event": "PAYMENT_CONFIRMED",
+        "payment": {"paymentLink": "lnk_teste", "subscription": None},
+    })
+    s.refresh(org)
+    assert transicao["transicao"] == "ativada"
+    assert org.assinatura_status == planos.STATUS_ATIVA
+    fim = planos._com_fuso(org.fidelidade_fim)
+    assert fim is not None and fim > planos.agora_utc() + datetime.timedelta(days=300)
+    # parcela seguinte dentro do período não estende a fidelidade
+    assinaturas.processar_evento(s, {
+        "event": "PAYMENT_RECEIVED", "payment": {"paymentLink": "lnk_teste"},
+    })
+    s.refresh(org)
+    assert planos._com_fuso(org.fidelidade_fim) == fim

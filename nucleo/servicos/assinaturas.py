@@ -38,6 +38,30 @@ def _somar_meses(data: datetime.date, meses: int) -> datetime.date:
     return data.replace(year=ano, month=mes, day=min(data.day, calendar.monthrange(ano, mes)[1]))
 
 
+def _link_anual(s: Session, org: Organizacao, plano: str) -> str:
+    """Plano anual: link de pagamento parcelável (até 10x), cobrado no ato. A fidelidade começa
+    quando o pagamento é confirmado (ver processar_evento)."""
+    if org.asaas_link_url and org.asaas_link_id and org.plano == plano and org.ciclo == planos.CICLO_ANUAL:
+        return org.asaas_link_url  # mesmo plano e ciclo: reaproveita o link já criado
+    nome = planos.PRECOS[plano]["nome"]
+    valor = planos.valor_cobranca(plano, planos.CICLO_ANUAL)
+    link_id, url = asaas.criar_link_anual(
+        nome=f"Decidiu - plano {nome} anual",
+        descricao=(f"Assinatura anual do plano {nome} do Decidiu. Fidelidade de 12 meses em contrato. "
+                   "Pagamento no ato, em até 10x no cartão."),
+        valor=valor,
+        parcelas_maximas=planos.PARCELAS_MAXIMAS_ANUAL,
+        referencia=f"org:{org.id}",
+    )
+    org.plano = plano
+    org.ciclo = planos.CICLO_ANUAL
+    org.asaas_link_id = link_id
+    org.asaas_link_url = url
+    s.add(org)
+    s.commit()
+    return url
+
+
 def assinar(s: Session, usuario: Usuario, plano: str, ciclo: str, cpf_cnpj: str) -> str:
     """Cria (ou reaproveita) a assinatura e devolve o link de pagamento."""
     if not usuario.admin:
@@ -53,6 +77,9 @@ def assinar(s: Session, usuario: Usuario, plano: str, ciclo: str, cpf_cnpj: str)
     if plano == planos.PLANO_FUNDADOR and org.plano != planos.PLANO_FUNDADOR \
             and planos.vagas_fundador_restantes(s) <= 0:
         raise ValueError("As vagas do plano Fundador já foram preenchidas. Escolha o plano Equipe.")
+
+    if ciclo == planos.CICLO_ANUAL:
+        return _link_anual(s, org, plano)
 
     if org.asaas_assinatura_id:  # já existe cobrança aguardando pagamento
         if org.plano != plano or org.ciclo != ciclo:
@@ -107,6 +134,24 @@ def assinar_com_senha(s: Session, username: str, senha: str, plano: str, ciclo: 
     return assinar(s, usuario, plano, ciclo, cpf_cnpj)
 
 
+def _organizacao_do_link(s: Session, link_id: Optional[str]) -> Optional[Organizacao]:
+    if not link_id:
+        return None
+    return s.exec(select(Organizacao).where(Organizacao.asaas_link_id == link_id)).first()
+
+
+def _renovar_fidelidade_anual(org: Organizacao) -> None:
+    """Pagamento confirmado: abre 12 meses de fidelidade, a não ser que ainda esteja dentro
+    de um período já pago (parcelas seguintes não estendem o prazo)."""
+    agora = planos.agora_utc()
+    fim = planos._com_fuso(org.fidelidade_fim)
+    if fim is not None and fim > agora:
+        return
+    fim_novo = _somar_meses(agora.date(), planos.MESES_FIDELIDADE_ANUAL)
+    org.fidelidade_fim = datetime.datetime(fim_novo.year, fim_novo.month, fim_novo.day,
+                                           tzinfo=datetime.timezone.utc)
+
+
 def _organizacao_da_assinatura(s: Session, assinatura_id: Optional[str]) -> Optional[Organizacao]:
     if not assinatura_id:
         return None
@@ -118,17 +163,21 @@ def processar_evento(s: Session, evento: dict) -> Optional[dict]:
     ('ativada' só na primeira vez que a organização passa a ativa, 'cancelada', 'atrasada')."""
     tipo = evento.get("event")
     if tipo in EVENTOS_PAGOS + EVENTOS_ATRASO:
-        assinatura_id = (evento.get("payment") or {}).get("subscription")
+        pagamento = evento.get("payment") or {}
+        org = _organizacao_da_assinatura(s, pagamento.get("subscription"))
+        if org is None:  # plano anual: o pagamento veio do link da organização
+            org = _organizacao_do_link(s, pagamento.get("paymentLink"))
     elif tipo in EVENTOS_CANCELAMENTO:
-        assinatura_id = (evento.get("subscription") or {}).get("id")
+        org = _organizacao_da_assinatura(s, (evento.get("subscription") or {}).get("id"))
     else:
         return None
-    org = _organizacao_da_assinatura(s, assinatura_id)
     if org is None:
         return None
     anterior = org.assinatura_status
     if tipo in EVENTOS_PAGOS:
         org.assinatura_status = planos.STATUS_ATIVA
+        if org.ciclo == planos.CICLO_ANUAL:
+            _renovar_fidelidade_anual(org)
     elif tipo in EVENTOS_ATRASO:
         org.assinatura_status = planos.STATUS_ATRASADA
     else:

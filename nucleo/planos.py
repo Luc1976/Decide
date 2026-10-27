@@ -8,7 +8,8 @@ Valores e prazos combinados com o dono do produto:
 - Clientes que só acompanham projetos não contam como integrantes (em todos os planos).
 - Fundador: plano separado, com as mesmas funções e limites do Equipe, a R$ 49,90 por mês para sempre,
   com fidelidade de 12 meses em contrato. Vagas limitadas (15 primeiros escritórios).
-- Planos anuais: fidelidade de 12 meses em contrato; cobrança no ato da assinatura.
+- Planos anuais: fidelidade de 12 meses em contrato; pagamento no ato, em até 10x (link do Asaas).
+  Ao fim da fidelidade paga, o acesso vence e volta com a renovação.
 - Teste grátis de 30 dias antes de qualquer cobrança. Cobrança só por cartão de crédito.
 
 A fidelidade do Fundador é contratual: o Asaas não a impõe, então o sistema não a bloqueia.
@@ -24,6 +25,7 @@ DIAS_TESTE = 30
 LIMITE_FUNDADORES = 15
 MESES_FIDELIDADE_FUNDADOR = 12
 MESES_FIDELIDADE_ANUAL = 12  # planos anuais: fidelidade de 12 meses em contrato
+PARCELAS_MAXIMAS_ANUAL = 10  # o pagador escolhe de 1 a 10 parcelas no link
 
 PLANO_TESTE = "teste"
 PLANO_SOLO = "solo"
@@ -73,6 +75,9 @@ MENSAGEM_ASSINATURA_PENDENTE = (
 MENSAGEM_ASSINATURA_ATRASADA = (
     "A assinatura da sua organização está com pagamento em atraso. Regularize para voltar a acessar."
 )
+MENSAGEM_ANUAL_VENCIDO = (
+    "O plano anual da sua organização venceu. Renove a assinatura para continuar usando o Decidiu."
+)
 MENSAGEM_ASSINATURA_CANCELADA = (
     "A assinatura da sua organização foi cancelada. Escolha um plano para continuar."
 )
@@ -100,17 +105,29 @@ def valor_cobranca(plano: str, ciclo: str) -> float:
     return tabela[ciclo]
 
 
+def _anual_vencido(org: Organizacao, agora: datetime.datetime) -> bool:
+    """Plano anual cuja fidelidade paga já acabou: o acesso só volta com a renovação."""
+    if org.ciclo != CICLO_ANUAL:
+        return False
+    fim = _com_fuso(org.fidelidade_fim)
+    return fim is not None and fim <= agora
+
+
 def acesso_liberado(org: Organizacao, agora: Optional[datetime.datetime] = None) -> bool:
     """Pode a organização usar o app agora? Só regra de assinatura, sem olhar a flag 'ativa'."""
-    if org.plano == PLANO_INTERNO or org.assinatura_status == STATUS_ATIVA:
+    if org.plano == PLANO_INTERNO:
         return True
     agora = _com_fuso(agora or agora_utc())
+    if org.assinatura_status == STATUS_ATIVA:
+        return not _anual_vencido(org, agora)
     fim_teste = _com_fuso(org.teste_fim)
     return org.assinatura_status == STATUS_TESTE and fim_teste is not None and fim_teste > agora
 
 
 def motivo_bloqueio(org: Organizacao) -> str:
     """Mensagem para a organização bloqueada pela assinatura."""
+    if org.assinatura_status == STATUS_ATIVA:
+        return MENSAGEM_ANUAL_VENCIDO
     if org.assinatura_status == STATUS_TESTE:
         return MENSAGEM_TESTE_ENCERRADO
     if org.assinatura_status == STATUS_PENDENTE:

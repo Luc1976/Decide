@@ -74,3 +74,23 @@ def test_teste_usa_limites_do_solo_e_interno_nao_tem_limite():
     teste = _org(plano="teste", assinatura_status="teste")
     assert planos.limites_da_org(teste) == planos.LIMITES["solo"]
     assert planos.limites_da_org(_org(plano="interno", assinatura_status="ativa")) is None
+
+
+def test_anual_com_fidelidade_vencida_bloqueia_mesmo_ativo():
+    fim = datetime.datetime(2026, 12, 31)
+    anual = _org(plano="solo", assinatura_status="ativa", ciclo="anual", fidelidade_fim=fim)
+    assert planos.acesso_liberado(anual, datetime.datetime(2026, 6, 1)) is True
+    assert planos.acesso_liberado(anual, datetime.datetime(2027, 1, 2)) is False
+    assert "venceu" in planos.motivo_bloqueio(anual)
+
+
+def test_mensal_ativo_nao_depende_de_fidelidade():
+    mensal = _org(plano="equipe", assinatura_status="ativa", ciclo="mensal",
+                  fidelidade_fim=datetime.datetime(2026, 12, 31))
+    assert planos.acesso_liberado(mensal, datetime.datetime(2027, 1, 2)) is True
+
+
+def test_limites_ia_por_plano():
+    assert planos.limite_ia_mensal(_org(plano="solo")) == 10
+    assert planos.limite_ia_mensal(_org(plano="equipe")) == 50
+    assert planos.limite_ia_mensal(_org(plano="interno")) is None

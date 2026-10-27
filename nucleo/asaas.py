@@ -83,6 +83,25 @@ def criar_assinatura(cliente_id: str, valor: float, ciclo: str, proximo_vencimen
     return resposta["id"]
 
 
+def criar_link_anual(nome: str, descricao: str, valor: float, parcelas_maximas: int,
+                      referencia: str) -> tuple:
+    """Link de pagamento parcelável (até parcelas_maximas, escolhidas pelo pagador), cobrado no ato.
+    Devolve (id do link, url). Os pagamentos feitos por ele trazem 'paymentLink' com esse id."""
+    resposta = _chamar("POST", "/paymentLinks", {
+        "name": nome,
+        "description": descricao,
+        "value": valor,
+        "billingType": "CREDIT_CARD",
+        "chargeType": "INSTALLMENT",
+        "maxInstallmentCount": parcelas_maximas,
+        "externalReference": referencia,
+        "notificationEnabled": True,
+    })
+    if not resposta.get("id") or not resposta.get("url"):
+        raise ErroAsaas("O Asaas não devolveu o link de pagamento. Tente de novo em alguns minutos.")
+    return resposta["id"], resposta["url"]
+
+
 def link_primeira_cobranca(assinatura_id: str) -> Optional[str]:
     """Link da página de pagamento da cobrança mais recente da assinatura."""
     cobrancas = _chamar("GET", f"/subscriptions/{assinatura_id}/payments").get("data") or []
