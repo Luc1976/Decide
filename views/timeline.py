@@ -1304,6 +1304,7 @@ def build_timeline_view(
             vertical_alignment=ft.CrossAxisAlignment.START,
             controls=[
                 ft.Column(
+                    width=72,
                     horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                     controls=[
                         ft.Text(
@@ -1489,6 +1490,7 @@ def build_timeline_view(
                     vertical_alignment=ft.CrossAxisAlignment.START,
                     controls=[
                         ft.Column(
+                            width=72,
                             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
                             controls=[
                                 ft.Text(
@@ -1724,14 +1726,25 @@ def build_timeline_view(
 
     # Busca e as duas ações principais, logo acima da linha do tempo.
     campo_busca.col = col(12, md=6)
+    # No celular os botões empilham em largura total (ícone e texto sempre visíveis).
+    # No computador ficam lado a lado.
+    if compacto(page):
+        botoes_acoes = ft.Column(
+            col=col(12),
+            spacing=8,
+            horizontal_alignment=ft.CrossAxisAlignment.STRETCH,
+            controls=[btn_nova_decisao, btn_atas, btn_pendencias_principal],
+        )
+    else:
+        botoes_acoes = ft.Row(
+            col=col(12, md=6),
+            spacing=8,
+            controls=[btn_nova_decisao, btn_atas, btn_pendencias_principal],
+        )
     acoes = ft.ResponsiveRow(
         vertical_alignment=ft.CrossAxisAlignment.CENTER,
         run_spacing=8,
-        controls=[
-            campo_busca,
-            ft.Row(col=col(12, md=6), spacing=8, wrap=True,
-                   controls=[btn_nova_decisao, btn_atas, btn_pendencias_principal]),
-        ],
+        controls=[campo_busca, botoes_acoes],
     )
 
     carregar_timeline()
