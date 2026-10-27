@@ -1,13 +1,14 @@
 """Planos e regras de acesso do SaaS.
 
 Valores e prazos combinados com o dono do produto:
-- Solo: R$ 29,90 por mês, ou R$ 290 por ano. 1 usuário com acesso total, 5 projetos ativos,
+- Solo: R$ 29,90 por mês, ou R$ 299 por ano. 1 usuário com acesso total, 5 projetos ativos,
   10 atas por mês geradas com IA.
-- Equipe: R$ 79,90 por mês, ou R$ 790 por ano. 10 integrantes com acesso total (1 administrador
+- Equipe: R$ 79,90 por mês, ou R$ 799 por ano. 10 integrantes com acesso total (1 administrador
   + 9 colaboradores), 30 projetos ativos, 50 atas por mês geradas com IA.
 - Clientes que só acompanham projetos não contam como integrantes (em todos os planos).
-- Fundador: plano separado, com as mesmas funções e limites do Equipe, a R$ 49 por mês para sempre,
+- Fundador: plano separado, com as mesmas funções e limites do Equipe, a R$ 49,90 por mês para sempre,
   com fidelidade de 12 meses em contrato. Vagas limitadas (15 primeiros escritórios).
+- Planos anuais: fidelidade de 12 meses em contrato; cobrança no ato da assinatura.
 - Teste grátis de 30 dias antes de qualquer cobrança. Cobrança só por cartão de crédito.
 
 A fidelidade do Fundador é contratual: o Asaas não a impõe, então o sistema não a bloqueia.
@@ -22,6 +23,7 @@ from nucleo.tabelas import Organizacao
 DIAS_TESTE = 30
 LIMITE_FUNDADORES = 15
 MESES_FIDELIDADE_FUNDADOR = 12
+MESES_FIDELIDADE_ANUAL = 12  # planos anuais: fidelidade de 12 meses em contrato
 
 PLANO_TESTE = "teste"
 PLANO_SOLO = "solo"
@@ -40,9 +42,9 @@ CICLO_ANUAL = "anual"
 
 # Preço por ciclo, em reais. O Fundador só existe no mensal.
 PRECOS = {
-    PLANO_SOLO: {"nome": "Solo", CICLO_MENSAL: 29.90, CICLO_ANUAL: 290.00},
-    PLANO_EQUIPE: {"nome": "Equipe", CICLO_MENSAL: 79.90, CICLO_ANUAL: 790.00},
-    PLANO_FUNDADOR: {"nome": "Fundador", CICLO_MENSAL: 49.00},
+    PLANO_SOLO: {"nome": "Solo", CICLO_MENSAL: 29.90, CICLO_ANUAL: 299.00},
+    PLANO_EQUIPE: {"nome": "Equipe", CICLO_MENSAL: 79.90, CICLO_ANUAL: 799.00},
+    PLANO_FUNDADOR: {"nome": "Fundador", CICLO_MENSAL: 49.90},
 }
 
 # Limites de uso por plano. O teste grátis usa os limites do Solo.

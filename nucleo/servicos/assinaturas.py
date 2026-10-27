@@ -67,10 +67,11 @@ def assinar(s: Session, usuario: Usuario, plano: str, ciclo: str, cpf_cnpj: str)
     if org.asaas_cliente_id is None:
         org.asaas_cliente_id = asaas.criar_cliente(org.nome, cpf, usuario.email or usuario.username,
                                                    f"org:{org.id}")
-    # Quem assina durante o teste começa a pagar só quando o teste termina.
+    # Mensal: quem assina durante o teste começa a pagar quando o teste termina.
+    # Anual: cobrança no ato da assinatura.
     inicio = hoje
     fim_teste = planos._com_fuso(org.teste_fim)
-    if org.assinatura_status == planos.STATUS_TESTE and fim_teste is not None:
+    if ciclo == planos.CICLO_MENSAL and org.assinatura_status == planos.STATUS_TESTE and fim_teste is not None:
         inicio = max(hoje, fim_teste.date())
     assinatura_id = asaas.criar_assinatura(
         cliente_id=org.asaas_cliente_id,
@@ -83,8 +84,10 @@ def assinar(s: Session, usuario: Usuario, plano: str, ciclo: str, cpf_cnpj: str)
     org.plano = plano
     org.ciclo = ciclo
     org.asaas_assinatura_id = assinatura_id
-    if plano == planos.PLANO_FUNDADOR:
-        fim = _somar_meses(hoje, planos.MESES_FIDELIDADE_FUNDADOR)
+    # Fidelidade: plano Fundador e planos anuais (em contrato).
+    if plano == planos.PLANO_FUNDADOR or ciclo == planos.CICLO_ANUAL:
+        meses = planos.MESES_FIDELIDADE_FUNDADOR if plano == planos.PLANO_FUNDADOR else planos.MESES_FIDELIDADE_ANUAL
+        fim = _somar_meses(hoje, meses)
         org.fidelidade_fim = datetime.datetime(fim.year, fim.month, fim.day, tzinfo=datetime.timezone.utc)
     s.add(org)
     s.commit()

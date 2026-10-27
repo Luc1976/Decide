@@ -14,10 +14,10 @@ def _org(**campos) -> Organizacao:
 
 def test_precos_combinados():
     assert planos.valor_cobranca("solo", "mensal") == 29.90
-    assert planos.valor_cobranca("solo", "anual") == 290.00
+    assert planos.valor_cobranca("solo", "anual") == 299.00
     assert planos.valor_cobranca("equipe", "mensal") == 79.90
-    assert planos.valor_cobranca("equipe", "anual") == 790.00
-    assert planos.valor_cobranca("fundador", "mensal") == 49.00
+    assert planos.valor_cobranca("equipe", "anual") == 799.00
+    assert planos.valor_cobranca("fundador", "mensal") == 49.90
 
 
 def test_fundador_nao_tem_anual_e_plano_invalido_falha():
