@@ -1631,6 +1631,15 @@ def build_timeline_view(
     btn_pendencias_principal = tema.botao_destaque(
         rotulo(page, "Pendências", "Pend."), ft.Icons.PENDING_ACTIONS, abrir_pendencias, terciario=True, expand=True
     )
+    # Pendências em amarelo (âmbar), com texto escuro para manter o contraste nos dois temas.
+    btn_pendencias_principal.style = ft.ButtonStyle(
+        icon_size=20,
+        text_style=ft.TextStyle(weight=ft.FontWeight.W_600),
+        padding=ft.Padding.symmetric(horizontal=18, vertical=12),
+        bgcolor="#F9A825",
+        color=tema.TEXTO_SELO,
+        icon_color=tema.TEXTO_SELO,
+    )
 
     def aplicar_permissoes():
         """Mostra só o que o papel do usuário neste projeto permite."""
