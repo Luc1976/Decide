@@ -26,6 +26,7 @@ from nucleo.servicos import decisoes as s_decisoes
 from nucleo.servicos import documentos as s_documentos
 from nucleo.servicos import organizacoes as s_organizacoes
 from nucleo.servicos import ficha as s_ficha
+from nucleo.servicos import ia as s_ia
 from nucleo.servicos import pendencias as s_pendencias
 from nucleo.servicos import projetos as s_projetos
 from nucleo.servicos import usuarios as s_usuarios
@@ -573,3 +574,19 @@ def obter_padrao_construtivo(projeto_id: int) -> Optional[PadraoConstrutivo]:
 def salvar_padrao_construtivo(projeto_id: int, dados: dict, usuario_id: Optional[int] = None) -> PadraoConstrutivo:
     with nova_sessao() as s:
         return s_ficha.salvar_padrao(s, _ator(s, usuario_id), projeto_id, dados)
+
+
+def gerar_rascunho_ata(projeto_id: int, usuario_id: Optional[int], transcricao: str) -> dict:
+    """Rascunho de ata pela IA, respeitando o limite mensal do plano da organização.
+    Devolve {"texto", "participantes", "avisos", "uso": {"usado", "limite", "plano"}}.
+    Lança ErroIA (com a mensagem para a pessoa) se o limite foi atingido ou a IA falhou."""
+    with nova_sessao() as s:
+        ator = _ator(s, usuario_id)
+        resultado = s_ia.rascunho_de_ata(s, ator, projeto_id, transcricao)
+        resultado["uso"] = s_ia.situacao_uso(s, ator, projeto_id)
+    return resultado
+
+
+def uso_ia_do_projeto(projeto_id: int, usuario_id: Optional[int]) -> dict:
+    with nova_sessao() as s:
+        return s_ia.situacao_uso(s, _ator(s, usuario_id), projeto_id)

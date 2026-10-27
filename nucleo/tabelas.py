@@ -15,6 +15,7 @@ import datetime
 from enum import Enum
 from typing import Optional
 
+from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 
@@ -272,3 +273,14 @@ class RegistroAuditoria(SQLModel, table=True):
     alvo_tipo: Optional[str] = None        # "decisao", "reuniao", "pendencia"...
     alvo_id: Optional[int] = None
     detalhes: Optional[str] = None         # texto curto (ou JSON) para leitura humana
+
+
+class UsoIA(SQLModel, table=True):
+    """Transcrições de IA (rascunho de ata) geradas por organização em cada mês.
+    Tabela nova: create_all/migração 0009 a criam sem mexer nas outras."""
+    __tablename__ = "usoia"
+    __table_args__ = (UniqueConstraint("organizacao_id", "ano_mes", name="uq_usoia_org_mes"),)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    organizacao_id: int = Field(index=True)  # sem FK: o registro sobrevive
+    ano_mes: str = Field(max_length=7)       # "AAAA-MM"
+    quantidade: int = 0

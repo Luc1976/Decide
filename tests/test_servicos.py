@@ -169,3 +169,25 @@ def test_rascunho_ia_usa_contexto_do_projeto(s, cenario):
     assert "Usar laje nervurada" in r["texto"]
     with pytest.raises(SemPermissao):
         ia.rascunho_de_ata(s, cenario["cli"], p, texto, chamar=falso)
+
+
+def test_cota_mensal_de_ia_por_plano(s, cenario):
+    from nucleo import planos
+    from nucleo.servicos import ia
+    from nucleo.tabelas import Organizacao, Projeto
+
+    p, bia = cenario["p"], cenario["bia"]
+    org = s.get(Organizacao, s.get(Projeto, p).organizacao_id)
+    limite = planos.LIMITES_IA_MENSAL[org.plano]
+    assert ia.situacao_uso(s, bia, p)["limite"] == limite
+    for _ in range(limite):
+        ia.registrar_uso(s, org.id)
+    with pytest.raises(ia.ErroIA):
+        ia.verificar_cota(s, bia, p)
+    assert ia.situacao_uso(s, bia, p)["usado"] == limite
+    # operação interna não tem limite
+    org.plano = planos.PLANO_INTERNO
+    s.add(org)
+    s.commit()
+    assert ia.verificar_cota(s, bia, p) == org.id
+    assert ia.situacao_uso(s, bia, p)["limite"] is None

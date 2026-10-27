@@ -12,7 +12,6 @@ from ata_pdf import gerar_ata_pdf, nome_do_arquivo_ata
 from config import NOME_APP, RELATORIOS_DIR, limpar_relatorios_antigos
 from seguranca import assinar_token, segredo_do_servidor
 from database import (
-    buscar_decisoes_projeto,
     adicionar_adendo,
     atualizar_reuniao_rascunho,
     buscar_reuniao,
@@ -22,15 +21,14 @@ from database import (
     extrair_decisoes,
     extrair_pendencias,
     fechar_reuniao,
-    listar_pendencias,
+    gerar_rascunho_ata,
     listar_pendencias_reuniao,
-    PENDENCIA_ABERTA,
     listar_adendos,
     listar_alteracoes_ficha_ata,
     listar_decisoes_reuniao,
     nivel_no_projeto,
 )
-from models import CATEGORIAS, IMPACTOS, NIVEL_PAPEL
+from models import NIVEL_PAPEL
 from layout import col, largura_dialogo, opcoes_dialogo
 from logos import logo_empresa, logo_projeto
 from ficha_calculos import analisar_alteracoes_ata
@@ -312,25 +310,9 @@ def build_atas_view(
             # só quem edita o projeto chega aqui; a chave da IA fica no servidor
             if nivel_no_projeto(usuario.id, projeto.id) < NIVEL_PAPEL["Editor"]:
                 raise PermissionError("Sem permissão para editar este projeto.")
-            recarregar_campos_ficha()
-            recentes = [
-                f"{_codigo(d)} {d.titulo}" for d in buscar_decisoes_projeto(projeto.id, "")
-            ]
-            abertas = [
-                f"P-{p.numero:03d} {p.titulo}"
-                for p in listar_pendencias(projeto.id, status=PENDENCIA_ABERTA)
-            ]
+            # a cota do plano é conferida e contada no servidor (nucleo/servicos/ia.py)
             resultado = await asyncio.to_thread(
-                ia_transcricao.gerar_rascunho,
-                input_transcricao.value,
-                projeto.id,
-                projeto.nome,
-                CATEGORIAS,
-                IMPACTOS,
-                list(campos_ficha),
-                recentes,
-                None,
-                abertas,
+                gerar_rascunho_ata, projeto.id, usuario.id, input_transcricao.value
             )
         except (ia_transcricao.ErroIA, PermissionError) as erro:
             mensagem_importar.color = ft.Colors.ERROR
@@ -350,7 +332,12 @@ def build_atas_view(
         input_texto.value = (atual + "\n\n" if atual else "") + resultado["texto"]
         if resultado["participantes"] and not lista_participantes():
             gravar_participantes(resultado["participantes"])
-        aviso_ia.value = " ".join(resultado["avisos"])
+        uso = resultado.get("uso") or {}
+        linha_uso = ""
+        if uso.get("limite") is not None:
+            linha_uso = (f"Transcrições de IA neste mês: {uso['usado']} de {uso['limite']} "
+                         f"(plano {uso['plano']}).")
+        aviso_ia.value = " ".join([*resultado["avisos"], linha_uso]).strip()
         input_transcricao.value = ""
         botao_gerar.disabled = False
         progresso_importar.visible = False

@@ -50,6 +50,15 @@ LIMITES = {
 }
 PLANO_BASE_TESTE = PLANO_SOLO
 
+# Transcrições de IA (rascunho de ata) por organização, por mês. Conta só o que foi gerado com sucesso.
+# Operação interna (PLANO_INTERNO) não tem limite.
+LIMITES_IA_MENSAL = {
+    PLANO_TESTE: 5,
+    PLANO_SOLO: 10,
+    PLANO_EQUIPE: 50,
+    PLANO_FUNDADOR: 50,
+}
+
 MENSAGEM_TESTE_ENCERRADO = (
     "Seu período de teste terminou. Escolha um plano para continuar usando o Decidiu."
 )
@@ -119,6 +128,17 @@ def _nome_do_plano(org: Organizacao) -> str:
     if org.plano == PLANO_TESTE:
         return "Teste"
     return PRECOS.get(org.plano, {}).get("nome", org.plano)
+
+
+def nome_do_plano(org: Organizacao) -> str:
+    return _nome_do_plano(org)
+
+
+def limite_ia_mensal(org: Organizacao) -> Optional[int]:
+    """Transcrições de IA permitidas por mês para a organização, ou None quando não há limite."""
+    if org.plano == PLANO_INTERNO:
+        return None
+    return LIMITES_IA_MENSAL.get(org.plano, 0)
 
 
 def erro_limite_usuario(org: Organizacao, administradores: int, colaboradores: int,
