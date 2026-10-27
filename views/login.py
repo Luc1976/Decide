@@ -1,8 +1,11 @@
+import asyncio
+
 import flet as ft
 from marca import marca_login
 
 from layout import compacto, largura_campo
 from nucleo.legal import url_termos
+from views import lembrar_usuario
 from views.planos import texto_termos
 
 
@@ -31,8 +34,22 @@ def build_login_view(on_login, page=None, on_cadastro=None, on_esqueci=None, on_
     input_senha = ft.TextField(label="Senha", width=largura, password=True, can_reveal_password=True,
                                prefix_icon=ft.Icons.LOCK)
 
+    lembrar = ft.Checkbox(label="Salvar meu usuário neste aparelho", value=False)
+
+    async def preencher_usuario():
+        """Traz o usuário guardado da última entrada, se o aparelho tiver um."""
+        salvo = await lembrar_usuario.ler(page)
+        if salvo and not input_user.value:
+            input_user.value = salvo
+            lembrar.value = True
+            atualizar()
+
     async def fazer_login(_):
+        usuario_digitado = (input_user.value or "").strip()
         await on_login(input_user.value, input_senha.value, msg)
+        # só guarda quando a entrada deu certo (sem mensagem de erro)
+        if page is not None and not msg.value:
+            await lembrar_usuario.gravar(page, usuario_digitado if lembrar.value else "")
 
     async def ir_planos(_):
         if page is not None:
@@ -41,11 +58,28 @@ def build_login_view(on_login, page=None, on_cadastro=None, on_esqueci=None, on_
     entrar = [
         input_user,
         input_senha,
-        ft.Button(content="Entrar", width=largura, on_click=fazer_login),
+        lembrar,
+        # Botão de entrada em destaque: cinza claro com texto laranja em negrito
+        ft.Button(
+            content=ft.Text("Entrar", weight=ft.FontWeight.BOLD, size=16, color="#A83F00"),
+            width=largura,
+            style=ft.ButtonStyle(
+                bgcolor="#E0E0E0",
+                color="#A83F00",
+                padding=ft.Padding.symmetric(vertical=14),
+            ),
+            on_click=fazer_login,
+        ),
         ft.TextButton(content="Criar conta grátis (30 dias)", on_click=lambda _: mostrar("cadastro")),
         ft.TextButton(content="Esqueci minha senha", on_click=lambda _: mostrar("esqueci")),
         ft.TextButton(content="Ver planos e assinar", on_click=ir_planos),
     ]
+
+    if page is not None:  # carrega o usuário guardado sem bloquear a tela
+        try:
+            asyncio.create_task(preencher_usuario())
+        except RuntimeError:
+            pass
 
     # ---------------- criar conta
     c_escritorio = ft.TextField(label="Nome do escritório", width=largura, prefix_icon=ft.Icons.BUSINESS)
