@@ -13,9 +13,9 @@ def _org(**campos) -> Organizacao:
 
 
 def test_precos_combinados():
-    assert planos.valor_cobranca("solo", "mensal") == 29.00
+    assert planos.valor_cobranca("solo", "mensal") == 29.90
     assert planos.valor_cobranca("solo", "anual") == 290.00
-    assert planos.valor_cobranca("equipe", "mensal") == 79.00
+    assert planos.valor_cobranca("equipe", "mensal") == 79.90
     assert planos.valor_cobranca("equipe", "anual") == 790.00
     assert planos.valor_cobranca("fundador", "mensal") == 49.00
 
@@ -50,17 +50,17 @@ def test_teste_com_fuso_aware_nao_quebra_comparacao():
     assert planos.acesso_liberado(_org(plano="teste", assinatura_status="teste", teste_fim=fim), agora)
 
 
-def test_limite_usuarios_solo_um_admin_dois_colaboradores():
+def test_limite_usuarios_solo_so_um_usuario():
     solo = _org(plano="solo", assinatura_status="ativa")
-    assert planos.erro_limite_usuario(solo, administradores=1, colaboradores=1, novo_admin=False) is None
-    assert planos.erro_limite_usuario(solo, administradores=1, colaboradores=2, novo_admin=False) is not None
+    assert planos.erro_limite_usuario(solo, administradores=1, colaboradores=0, novo_admin=False) is not None
     assert planos.erro_limite_usuario(solo, administradores=1, colaboradores=0, novo_admin=True) is not None
+    assert planos.erro_limite_usuario(solo, administradores=1, colaboradores=0, novo_admin=False, novo_cliente=True) is None
 
 
-def test_limite_usuarios_equipe_16_pessoas():
+def test_limite_usuarios_equipe_10_integrantes():
     equipe = _org(plano="equipe", assinatura_status="ativa")
-    assert planos.erro_limite_usuario(equipe, administradores=1, colaboradores=14, novo_admin=False) is None
-    assert planos.erro_limite_usuario(equipe, administradores=1, colaboradores=15, novo_admin=False) is not None
+    assert planos.erro_limite_usuario(equipe, administradores=1, colaboradores=8, novo_admin=False) is None
+    assert planos.erro_limite_usuario(equipe, administradores=1, colaboradores=9, novo_admin=False) is not None
 
 
 def test_limite_projetos_solo_5_equipe_30():

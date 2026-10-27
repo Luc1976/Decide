@@ -1,9 +1,12 @@
 """Planos e regras de acesso do SaaS.
 
 Valores e prazos combinados com o dono do produto:
-- Solo: R$ 29 por mês, ou R$ 290 por ano (2 meses grátis).
-- Equipe: R$ 79 por mês, ou R$ 790 por ano (2 meses grátis).
-- Fundador: plano separado, com as mesmas funções do Equipe, a R$ 49 por mês para sempre,
+- Solo: R$ 29,90 por mês, ou R$ 290 por ano. 1 usuário com acesso total, 5 projetos ativos,
+  10 atas por mês geradas com IA.
+- Equipe: R$ 79,90 por mês, ou R$ 790 por ano. 10 integrantes com acesso total (1 administrador
+  + 9 colaboradores), 30 projetos ativos, 50 atas por mês geradas com IA.
+- Clientes que só acompanham projetos não contam como integrantes (em todos os planos).
+- Fundador: plano separado, com as mesmas funções e limites do Equipe, a R$ 49 por mês para sempre,
   com fidelidade de 12 meses em contrato. Vagas limitadas (15 primeiros escritórios).
 - Teste grátis de 30 dias antes de qualquer cobrança. Cobrança só por cartão de crédito.
 
@@ -37,16 +40,16 @@ CICLO_ANUAL = "anual"
 
 # Preço por ciclo, em reais. O Fundador só existe no mensal.
 PRECOS = {
-    PLANO_SOLO: {"nome": "Solo", CICLO_MENSAL: 29.00, CICLO_ANUAL: 290.00},
-    PLANO_EQUIPE: {"nome": "Equipe", CICLO_MENSAL: 79.00, CICLO_ANUAL: 790.00},
+    PLANO_SOLO: {"nome": "Solo", CICLO_MENSAL: 29.90, CICLO_ANUAL: 290.00},
+    PLANO_EQUIPE: {"nome": "Equipe", CICLO_MENSAL: 79.90, CICLO_ANUAL: 790.00},
     PLANO_FUNDADOR: {"nome": "Fundador", CICLO_MENSAL: 49.00},
 }
 
 # Limites de uso por plano. O teste grátis usa os limites do Solo.
 LIMITES = {
-    PLANO_SOLO: {"administradores": 1, "colaboradores": 2, "projetos": 5},
-    PLANO_EQUIPE: {"administradores": 1, "colaboradores": 15, "projetos": 30},
-    PLANO_FUNDADOR: {"administradores": 1, "colaboradores": 15, "projetos": 30},
+    PLANO_SOLO: {"administradores": 1, "colaboradores": 0, "projetos": 5},
+    PLANO_EQUIPE: {"administradores": 1, "colaboradores": 9, "projetos": 30},
+    PLANO_FUNDADOR: {"administradores": 1, "colaboradores": 9, "projetos": 30},
 }
 PLANO_BASE_TESTE = PLANO_SOLO
 
