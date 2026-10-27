@@ -312,6 +312,7 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar, on_open_docum
                     wrap=True,
                     alignment=ft.MainAxisAlignment.END,
                     controls=[
+                        ft.IconButton(icon=ft.Icons.HOME, tooltip="Ir para a linha do tempo", on_click=on_voltar),
                         tema.botao_secundario("Linha do tempo", ft.Icons.TIMELINE, on_voltar),
                         *(
                             [tema.botao_destaque(

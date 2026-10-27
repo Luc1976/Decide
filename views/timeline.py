@@ -1604,6 +1604,7 @@ def build_timeline_view(
         """Mostra quantos assuntos aguardam decisão no projeto ativo."""
         abertas = contar_pendencias_abertas(projeto.id)
         btn_pendencias.title.value = "Pendências de decisão" + (f" ({abertas})" if abertas else "")
+        btn_pendencias_principal.content = rotulo(page, "Pendências", "Pend.") + (f" ({abertas})" if abertas else "")
 
     def _abrir_novo_projeto(_):
         page.show_dialog(modal_projeto)
@@ -1624,6 +1625,9 @@ def build_timeline_view(
     )
     btn_atas = tema.botao_destaque(
         rotulo(page, "Atas de Reunião", "Atas"), ft.Icons.GROUPS, abrir_lista_atas, terciario=True, expand=True
+    )
+    btn_pendencias_principal = tema.botao_destaque(
+        rotulo(page, "Pendências", "Pend."), ft.Icons.PENDING_ACTIONS, abrir_pendencias, terciario=True, expand=True
     )
 
     def aplicar_permissoes():
@@ -1725,7 +1729,8 @@ def build_timeline_view(
         run_spacing=8,
         controls=[
             campo_busca,
-            ft.Row(col=col(12, md=6), spacing=8, controls=[btn_nova_decisao, btn_atas]),
+            ft.Row(col=col(12, md=6), spacing=8, wrap=True,
+                   controls=[btn_nova_decisao, btn_atas, btn_pendencias_principal]),
         ],
     )
 
