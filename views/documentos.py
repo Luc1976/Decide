@@ -5,7 +5,6 @@ observação e arquivos anexos. Itens padrão nascem com o projeto; a equipe acr
 Leitor (cliente) acompanha sem alterar. Regras em nucleo/servicos/documentos.py.
 """
 import datetime
-import inspect
 import uuid
 from pathlib import Path
 from urllib.parse import quote
@@ -31,6 +30,7 @@ from nucleo.armazenamento import TAMANHO_MAXIMO_ANEXO, armazenamento_padrao, nom
 from nucleo.servicos.documentos import resumo
 from nucleo.tabelas import DOC_NA, DOC_PENDENTE, DOC_RECEBIDO
 from seguranca import assinar_token, segredo_do_servidor
+from views.abrir_link import mostrar_link
 
 TODOS = "Todos"
 ICONES = {DOC_RECEBIDO: ft.Icons.CHECK_CIRCLE, DOC_PENDENTE: ft.Icons.SCHEDULE, DOC_NA: ft.Icons.BLOCK}
@@ -79,9 +79,7 @@ def build_documentos_view(page, projeto, usuario, on_logout, on_voltar):
             if not documento_tem_anexo(projeto.id, chave):
                 return
             token = assinar_token(segredo_do_servidor(), {"p": chave}, validade_s=300)
-            resultado = page.launch_url(f"/anexo/{quote(token)}")
-            if inspect.isawaitable(resultado):
-                await resultado
+            mostrar_link(page, f"/anexo/{quote(token)}", "Abrir arquivo")
         else:
             from views.timeline import abrir_arquivo_nativo
 
@@ -216,9 +214,7 @@ def build_documentos_view(page, projeto, usuario, on_logout, on_voltar):
         limpar_relatorios_antigos()
         if page.web:
             token = assinar_token(segredo_do_servidor(), {"p": relativo}, validade_s=900)
-            resultado = page.launch_url(f"/anexo/{quote(token)}")
-            if inspect.isawaitable(resultado):
-                await resultado
+            mostrar_link(page, f"/anexo/{quote(token)}", "Abrir PDF")
         else:
             from views.timeline import abrir_arquivo_nativo
 

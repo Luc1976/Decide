@@ -58,6 +58,7 @@ from logos import (
 from models import CATEGORIAS, IMPACTOS, NIVEL_PAPEL, PAPEIS
 from marca import marca_cabecalho
 from seguranca import assinar_token, segredo_do_servidor
+from views.abrir_link import mostrar_link
 
 PASTA_ANEXOS = "anexos_projetos"
 
@@ -1369,9 +1370,7 @@ def build_timeline_view(
                 ):
                     return
                 token = assinar_token(segredo_do_servidor(), {"p": caminho}, validade_s=300)
-                resultado = page.launch_url(f"/anexo/{quote(token)}")
-                if inspect.isawaitable(resultado):
-                    await resultado
+                mostrar_link(page, f"/anexo/{quote(token)}", "Abrir anexo")
             else:
                 abrir_arquivo_nativo(caminho)
 
