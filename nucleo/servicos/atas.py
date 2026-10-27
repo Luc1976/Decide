@@ -15,7 +15,10 @@ from ficha_calculos import analisar_alteracoes_ata
 from nucleo import auditoria, numeracao
 from nucleo.ator import Ator
 from nucleo.erros import Conflito, NaoEncontrado
-from nucleo.marcacoes import extrair_decisoes, extrair_pendencias, normalizar, titulo_da_linha
+from nucleo.marcacoes import (
+    FORMATO_DECISAO, erros_das_decisoes, extrair_decisoes, extrair_pendencias,
+    interpretar_decisao, normalizar, titulo_da_linha,
+)
 from nucleo.permissoes import EDITOR, LEITOR, exigir, pode_editar
 from nucleo.servicos import ficha as servico_ficha
 from nucleo.tabelas import ATA_FECHADA, ATA_RASCUNHO, AtaAdendo, Decisao, Pendencia, Reuniao
@@ -100,6 +103,7 @@ def pre_visualizar(s: Session, ator: Ator, projeto_id: int, texto: str) -> dict:
     alteracoes, erros = analisar_alteracoes_ata(texto, servico_ficha.consultar_campos(s, projeto_id))
     return {
         "decisoes": extrair_decisoes(texto),
+        "erros_decisoes": erros_das_decisoes(texto),
         "pendencias": extrair_pendencias(texto),
         "alteracoes_ficha": [
             {"decisao_indice": i, "grupo": g, "nome": n, "unidade": u or None, "valor": v}
@@ -164,18 +168,25 @@ def fechar(s: Session, ator: Ator, reuniao_id: int, projeto_id: Optional[int] = 
     alteracoes_ficha, erros = analisar_alteracoes_ata(ata.texto, servico_ficha.consultar_campos(s, pid))
     if erros:
         raise ValueError("Corrija as linhas [F]: " + "; ".join(erros) + ".")
+    # Cada [D] precisa de disciplina e impacto padrão do app; senão nada é gravado.
+    erros_d = erros_das_decisoes(ata.texto)
+    if erros_d:
+        raise ValueError(
+            "Corrija as linhas [D]: " + "; ".join(erros_d) + f". Formato: {FORMATO_DECISAO}."
+        )
 
     numeracao.travar_projeto(s, pid)
     numero = numeracao.proxima_decisao(s, pid)
     criadas = []
     for linha in extrair_decisoes(ata.texto):
+        marcas = interpretar_decisao(linha)
         dec = Decisao(
             projeto_id=pid,
-            titulo=titulo_da_linha(linha),
-            categoria="Geral",
-            descricao=linha,
+            titulo=titulo_da_linha(marcas["texto"]),
+            categoria=marcas["categoria"],
+            descricao=marcas["texto"],
             justificativa=f"Registrada na Ata {ata.numero:02d} - {ata.titulo}",
-            impacto="Médio",
+            impacto=marcas["impacto"],
             autor=ator.nome,
             data_decisao=ata.data_reuniao,
             reuniao_id=ata.id,

@@ -139,11 +139,11 @@ def test_padrao_construtivo(admin, projeto_padrao):
 # ---------------------------------------------------------------- atas
 
 TEXTO_ATA = """Reunião de alinhamento
-[D] Adotar estrutura metálica
+[D] (Estrutura) (Alto) Adotar estrutura metálica
 [F] TO = 60
 [F] Área do terreno = 2.000
 Discussão livre
-[D] Fachada em ACM
+[D] (Arquitetura) (Médio) Fachada em ACM
 [P] Definir cor da fachada
 """
 
@@ -154,6 +154,7 @@ def test_fechar_ata_cria_decisoes_pendencias_e_ficha(admin, projeto_padrao):
     assert ata.numero == 1 and ata.status == "Rascunho"
     criadas = db.fechar_reuniao(ata.id, "Lucas", admin.id)
     assert [d.titulo for d in criadas] == ["Adotar estrutura metálica", "Fachada em ACM"]
+    assert [(d.categoria, d.impacto) for d in criadas] == [("Estrutura", "Alto"), ("Arquitetura", "Médio")]
     assert [d.numero for d in criadas] == [1, 2]
     assert criadas[0].justificativa == "Registrada na Ata 01 - Alinhamento"
     assert criadas[0].data_decisao == datetime.date(2026, 5, 1)
@@ -174,7 +175,7 @@ def test_fechar_ata_cria_decisoes_pendencias_e_ficha(admin, projeto_padrao):
 
 
 def test_fechar_ata_com_f_invalida_nao_grava_nada(admin, projeto_padrao):
-    ata = db.criar_reuniao(projeto_padrao.id, "A", datetime.date.today(), "", "[D] X\n[F] campo inexistente = 3", "L", admin.id)
+    ata = db.criar_reuniao(projeto_padrao.id, "A", datetime.date.today(), "", "[D] (Estrutura) (Alto) X\n[F] campo inexistente = 3", "L", admin.id)
     with pytest.raises(ValueError, match=r"\[F\]"):
         db.fechar_reuniao(ata.id, "L", admin.id)
     assert db.listar_decisoes_projeto(projeto_padrao.id) == []

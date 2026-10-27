@@ -72,7 +72,7 @@ def cenario():
     projeto = db.listar_projetos_do_usuario(lucas.id)[0]
     db.adicionar_decisao(projeto.id, "Laje", "Estrutura", "d", "j", None, "Alto", "Lucas", None, None,
                          usuario_id=lucas.id)
-    ata = db.criar_reuniao(projeto.id, "Kickoff", datetime.date.today(), "", "[D] X\n[P] Y", "Lucas", lucas.id)
+    ata = db.criar_reuniao(projeto.id, "Kickoff", datetime.date.today(), "", "[D] (Geral) (Baixo) X\n[P] Y", "Lucas", lucas.id)
     db.fechar_reuniao(ata.id, "Lucas", lucas.id)
     db.criar_pendencia(projeto.id, "Cor", autor="Lucas", usuario_id=lucas.id)
     return lucas, projeto

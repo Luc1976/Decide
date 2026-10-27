@@ -59,7 +59,7 @@ def test_leitor_nao_grava_e_recebe_403(s, cenario):
 def test_leitor_nao_ve_rascunho_de_ata(s, cenario):
     p, bia, cli = cenario["p"], cenario["bia"], cenario["cli"]
     rascunho = atas.criar(s, bia, p, "Rascunho", datetime.date.today(), "", "texto")
-    fechada = atas.criar(s, bia, p, "Fechada", datetime.date.today(), "", "[D] Algo")
+    fechada = atas.criar(s, bia, p, "Fechada", datetime.date.today(), "", "[D] (Geral) (Baixo) Algo")
     atas.fechar(s, bia, fechada.id)
     assert {a.id for a in atas.listar(s, bia, p)} == {rascunho.id, fechada.id}
     assert [a.id for a in atas.listar(s, cli, p)] == [fechada.id]
@@ -191,3 +191,23 @@ def test_cota_mensal_de_ia_por_plano(s, cenario):
     s.commit()
     assert ia.verificar_cota(s, bia, p) == org.id
     assert ia.situacao_uso(s, bia, p)["limite"] is None
+
+
+def test_fechar_ata_grava_disciplina_e_impacto_da_linha_d(s, cenario):
+    p, bia = cenario["p"], cenario["bia"]
+    ata = atas.criar(s, bia, p, "Elétrica", datetime.date.today(), "",
+                     "[D] (Elétrica) (alto) Trocar quadro geral: 3 fases")
+    criadas = atas.fechar(s, bia, ata.id)
+    assert (criadas[0].titulo, criadas[0].categoria, criadas[0].impacto) == (
+        "Trocar quadro geral", "Elétrica", "Alto")
+    assert criadas[0].descricao == "Trocar quadro geral: 3 fases"
+
+
+def test_fechar_ata_recusa_decisao_sem_disciplina_ou_impacto(s, cenario):
+    p, bia = cenario["p"], cenario["bia"]
+    ata = atas.criar(s, bia, p, "Sem tags", datetime.date.today(), "", "[D] (Fase 2) Algo sem marcas")
+    with pytest.raises(ValueError, match=r"\[D\]"):
+        atas.fechar(s, bia, ata.id)
+    assert ata.status == "Rascunho"
+    prev = atas.pre_visualizar(s, bia, p, "[D] Só texto")
+    assert prev["erros_decisoes"] and "disciplina" in prev["erros_decisoes"][0]

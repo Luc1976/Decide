@@ -305,7 +305,17 @@ def montar_texto_ata(dados: dict, campos_ficha: list, categorias, impactos):
         titulo, descricao = _uma_linha(d.get("titulo")), _uma_linha(d.get("descricao"))
         if not (titulo or descricao):
             continue
-        linha = f"[D] {titulo}: {descricao}" if titulo and descricao else f"[D] {titulo or descricao}"
+        categoria, impacto = _uma_linha(d.get("categoria")), _uma_linha(d.get("impacto"))
+        # formato da linha: [D] (Disciplina) (Impacto) Título: descrição
+        marcas = []
+        if categoria in categorias:
+            marcas.append(f"({categoria})")
+        if impacto in impactos:
+            marcas.append(f"({impacto})")
+        if len(marcas) < 2:
+            avisos.append(f"Decisão \"{titulo or descricao}\": escolha a disciplina e o impacto na linha [D].")
+        texto_linha = f"{titulo}: {descricao}" if titulo and descricao else (titulo or descricao)
+        linha = "[D] " + " ".join(marcas + [texto_linha]).strip()
         extras = []
         if _uma_linha(d.get("responsavel")):
             extras.append(f"responsável: {_uma_linha(d['responsavel'])}")
@@ -314,14 +324,6 @@ def montar_texto_ata(dados: dict, campos_ficha: list, categorias, impactos):
         if extras:
             linha += " (" + "; ".join(extras) + ")"
         linhas.append(linha)
-        categoria, impacto = _uma_linha(d.get("categoria")), _uma_linha(d.get("impacto"))
-        detalhes = []
-        if categoria in categorias:
-            detalhes.append(f"sugestão de categoria: {categoria}")
-        if impacto in impactos:
-            detalhes.append(f"impacto sugerido: {impacto}")
-        if detalhes:
-            linhas.append("   " + "; ".join(detalhes))
         if _uma_linha(d.get("trecho")):
             linhas.append(f"   Trecho: \"{_uma_linha(d['trecho'])}\"")
 

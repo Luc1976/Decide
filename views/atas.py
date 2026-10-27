@@ -28,12 +28,14 @@ from database import (
     listar_decisoes_reuniao,
     nivel_no_projeto,
 )
-from models import NIVEL_PAPEL
+from models import CATEGORIAS, IMPACTOS, NIVEL_PAPEL
+from nucleo.marcacoes import FORMATO_DECISAO, erros_das_decisoes
 from layout import col, largura_dialogo, opcoes_dialogo
 from logos import logo_empresa, logo_projeto
 from ficha_calculos import analisar_alteracoes_ata
 
-DICA_DECISAO = "Comece a linha com [D] para registrar uma decisão."
+DICA_DECISAO = ("Linha [D] = decisão, com a disciplina e o impacto entre parênteses: "
+                "[D] (Estrutura) (Alto) Título: descrição.")
 DICA_FICHA = "Linha [F] campo = valor altera a ficha (vale para a [D] logo acima)."
 DICA_PENDENCIA = "Linha [P] = assunto que ficou sem decisão (vai para Pendências)."
 
@@ -174,12 +176,22 @@ def build_atas_view(
 
     input_texto = ft.TextField(
         label="Texto da ata",
-        hint_text="Escreva a ata. Linha [D] = decisão. " + DICA_FICHA + " " + DICA_PENDENCIA,
+        hint_text="Escreva a ata. " + DICA_DECISAO + " " + DICA_FICHA + " " + DICA_PENDENCIA,
         multiline=True,
         min_lines=18,
         max_lines=30,
         expand=True,
         on_change=atualizar_contador,
+    )
+    seletor_disciplina = ft.Dropdown(
+        label="Disciplina",
+        col=col(12, md=5),
+        options=[ft.DropdownOption(key=c, text=c) for c in CATEGORIAS],
+    )
+    seletor_impacto = ft.Dropdown(
+        label="Impacto",
+        col=col(12, md=3),
+        options=[ft.DropdownOption(key=i, text=i) for i in IMPACTOS],
     )
     mensagem_editor = ft.Text("", color=ft.Colors.ERROR, size=12)
     aviso_ficha = ft.Text("", size=12, color=tema.aviso(page))
@@ -201,10 +213,29 @@ def build_atas_view(
             contador_decisoes.value += (
                 f" · {len(alteracoes)} alteração(ões) da ficha"
             )
+        sem_marcas = len(erros_das_decisoes(input_texto.value))
+        if sem_marcas:
+            contador_decisoes.value += f" · {sem_marcas} sem disciplina ou impacto válido"
         qtd_pendencias = len(extrair_pendencias(input_texto.value))
         if qtd_pendencias:
             contador_decisoes.value += f" · {qtd_pendencias} pendência(s)"
         aviso_ficha.value = ("Atenção: " + "; ".join(erros) + ".") if erros else ""
+
+    def inserir_decisao(_=None):
+        if not seletor_disciplina.value or not seletor_impacto.value:
+            mensagem_editor.value = "Escolha a disciplina e o impacto antes de inserir a linha."
+            page.update()
+            return
+        atual = input_texto.value or ""
+        separador = "" if (not atual or atual.endswith("\n")) else "\n"
+        input_texto.value = f"{atual}{separador}[D] ({seletor_disciplina.value}) ({seletor_impacto.value}) "
+        mensagem_editor.value = ""
+        atualizar_resumo()
+        page.update()
+
+    botao_inserir_decisao = ft.TextButton(
+        content="Inserir linha [D]", icon=ft.Icons.ADD, on_click=inserir_decisao, col=col(12, md=4)
+    )
 
     def gravar_rascunho():
         """Valida e grava a ata como rascunho. Devolve a Reuniao ou None se houver erro."""
@@ -254,6 +285,15 @@ def build_atas_view(
         alteracoes, erros = analisar_alteracoes_ata(ata.texto, campos_ficha)
         if erros:
             mensagem_editor.value = "Corrija as linhas [F] antes de fechar: " + "; ".join(erros) + "."
+            page.update()
+            return
+        erros_d = erros_das_decisoes(ata.texto)
+        if erros_d:
+            mensagem_editor.value = (
+                "Corrija as linhas [D] antes de fechar: " + "; ".join(erros_d) + ". "
+                + "Formato: " + FORMATO_DECISAO + ". Disciplinas: " + ", ".join(CATEGORIAS)
+                + ". Impactos: " + ", ".join(IMPACTOS) + "."
+            )
             page.update()
             return
         qtd = len(extrair_decisoes(ata.texto))
@@ -408,6 +448,11 @@ def build_atas_view(
                         alignment=ft.MainAxisAlignment.START,
                     ),
                     input_participantes,
+                    ft.Text("Decisão", weight=ft.FontWeight.BOLD, size=13),
+                    ft.ResponsiveRow(
+                        [seletor_disciplina, seletor_impacto, botao_inserir_decisao],
+                        alignment=ft.MainAxisAlignment.START,
+                    ),
                     input_texto,
                     contador_decisoes,
                     aviso_ficha,

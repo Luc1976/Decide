@@ -114,7 +114,7 @@ def test_validacao_de_entrada_422(cliente, equipe):
 
 def test_fluxo_ata_decisoes_ficha_pendencias(cliente, equipe):
     pid, bia, cli = equipe["pid"], equipe["bia"], equipe["cli"]
-    texto = "[D] Estrutura metálica\n[F] Área do terreno = 1.000\n[F] CA = 2\n[P] Cor da fachada"
+    texto = "[D] (Estrutura) (Alto) Estrutura metálica\n[F] Área do terreno = 1.000\n[F] CA = 2\n[P] Cor da fachada"
 
     prev = cliente.post(f"{V}/projetos/{pid}/atas/pre-visualizar", json={"texto": texto}, headers=bia).json()
     assert prev["erros"] == [] and len(prev["alteracoes_ficha"]) == 2
