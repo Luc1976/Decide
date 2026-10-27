@@ -19,7 +19,9 @@ DB_PATH = DATA_DIR / "memoria_projetos.db"
 
 # Anexos enviados pelo navegador ficam em UPLOAD_DIR, FORA da pasta pública (ASSETS_DIR).
 # Só são entregues por /anexo/<link assinado e temporário>, depois de checar o acesso.
-ASSETS_DIR = DATA_DIR / "assets"   # pasta pública do Flet (fica vazia)
+# Pasta pública do Flet: ícones e tela de carregamento do Decidiu, versionados no repositório
+# (vão junto com o deploy). Não guarda dados de usuários.
+ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 UPLOAD_DIR = DATA_DIR / "uploads"
 
 NOME_APP = "Memória de Projetos"  # aparece no rodapé dos relatórios em PDF

@@ -4,6 +4,7 @@ import base64
 
 from fastapi import Response
 
+from config import ASSETS_DIR
 from marca import LOGO_CABECALHO_B64
 
 CAMINHOS = ("/favicon.ico", "/favicon.png", "/icon.png", "/apple-touch-icon.png")
@@ -11,7 +12,10 @@ CAMINHOS = ("/favicon.ico", "/favicon.png", "/icon.png", "/apple-touch-icon.png"
 
 def registrar_rota_icones(app) -> None:
     """Acrescenta os caminhos de ícone ao app ASGI, na frente da rota que atende o site."""
-    imagem = base64.b64decode(LOGO_CABECALHO_B64)
+    try:
+        imagem = (ASSETS_DIR / "icon.png").read_bytes()
+    except OSError:  # sem o arquivo novo, usa a logo embutida
+        imagem = base64.b64decode(LOGO_CABECALHO_B64)
 
     async def icone():
         return Response(content=imagem, media_type="image/png",
