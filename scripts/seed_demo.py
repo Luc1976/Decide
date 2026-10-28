@@ -310,6 +310,82 @@ def resumo(s: Session, pid: int) -> None:
     print(f"  ficha: {contar(Caracteristica)} campos, {contar(CaracteristicaHistorico)} registros no histórico")
 
 
+def instalar_logos(org_id: int, projeto_id: int) -> None:
+    """Grava os logos fictícios onde o app os procura (DATA_DIR/logos). Só faz sentido no
+    servidor, onde DATA_DIR é o volume do app."""
+    from logos import _gravar, caminho_logo_empresa, caminho_logo_projeto
+    pasta = Path(__file__).resolve().parent / "logos_demo"
+    _gravar(caminho_logo_empresa(org_id), (pasta / "logo-traco-austral.png").read_bytes())
+    _gravar(caminho_logo_projeto(projeto_id), (pasta / "logo-cambara.png").read_bytes())
+
+
+def _apagar_logos(s: Session) -> None:
+    """Logos da demonstração anterior (os nomes dos arquivos usam os ids, que mudam)."""
+    from logos import caminho_logo_empresa, caminho_logo_projeto
+    org = s.exec(select(Organizacao).where(Organizacao.slug == D.ORG_SLUG)).first()
+    if org is None:
+        return
+    caminhos = [caminho_logo_empresa(org.id)]
+    caminhos += [caminho_logo_projeto(pid) for pid in
+                 s.exec(select(Projeto.id).where(Projeto.organizacao_id == org.id)).all()]
+    for caminho in caminhos:
+        try:
+            caminho.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
+def _revisao_compativel(revisao) -> bool:
+    """O seed usa os serviços do app, então migrações POSTERIORES (que só acrescentam) não o
+    quebram; anterior à 0010 não serve."""
+    try:
+        return int(revisao) >= int(REVISAO_ESPERADA)
+    except (TypeError, ValueError):
+        return False
+
+
+def carregar_pelo_ambiente() -> None:
+    """Carga sem terminal, na partida do servidor (chamada por main.py depois de init_db).
+
+    DECIDIU_CARREGAR_DEMO=1      carrega a demonstração se ela ainda não existir.
+    DECIDIU_CARREGAR_DEMO=zerar  apaga e recria a demonstração a CADA partida (deploy ou restart).
+    DECIDIU_DEMO_SENHA           senha dos usuários demo.* (mínimo 6 caracteres).
+
+    Use só no ambiente de demonstração/testes. Qualquer erro vai para o log e o app sobe assim mesmo."""
+    modo = (os.getenv("DECIDIU_CARREGAR_DEMO") or "").strip().lower()
+    if modo in ("", "0", "nao", "não", "false"):
+        return
+    try:
+        senha = os.getenv("DECIDIU_DEMO_SENHA", "")
+        if len(senha) < 6:
+            print("[demo] DECIDIU_DEMO_SENHA ausente ou curta (mínimo 6): demonstração não carregada.", flush=True)
+            return
+        revisao = revisao_atual()
+        if not _revisao_compativel(revisao):
+            print(f"[demo] Banco na migração {revisao!r}; a demonstração exige {REVISAO_ESPERADA} ou posterior.",
+                  flush=True)
+            return
+        with nova_sessao() as s:
+            existe = s.exec(select(Organizacao.id).where(Organizacao.slug == D.ORG_SLUG)).first()
+            if existe and modo != "zerar":
+                print("[demo] Demonstração já carregada (DECIDIU_CARREGAR_DEMO=zerar para recriar).", flush=True)
+                return
+            if existe:
+                _apagar_logos(s)
+                zerar(s)
+            carga = Carga(s, senha)
+            carga.executar()
+            try:
+                instalar_logos(carga.org.id, carga.pid)
+            except Exception as erro:
+                print(f"[demo] Logos não instalados: {erro}", flush=True)
+            resumo(s, carga.pid)
+        print(f"[demo] Demonstração '{D.PROJETO_NOME}' carregada. Entre como demo.helena, demo.rafael "
+              "ou demo.marcos (cliente) com a senha de DECIDIU_DEMO_SENHA.", flush=True)
+    except Exception as erro:  # nunca derruba o app por causa da demonstração
+        print(f"[demo] ERRO ao carregar a demonstração: {type(erro).__name__}: {erro}", flush=True)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Carga do projeto de demonstração do Decidiu.")
     ap.add_argument("--zerar", action="store_true",
@@ -320,9 +396,9 @@ def main() -> int:
 
     print(f"Banco: {endereco_seguro()}")
     revisao = revisao_atual()
-    if revisao != REVISAO_ESPERADA:
-        print(f"ERRO: o banco está na migração {revisao!r}, e este seed foi escrito para "
-              f"{REVISAO_ESPERADA!r}. Atualize o banco (ou revise o seed) antes de continuar.")
+    if not _revisao_compativel(revisao):
+        print(f"ERRO: o banco está na migração {revisao!r}, e este seed exige {REVISAO_ESPERADA!r} "
+              "ou posterior. Atualize o banco antes de continuar.")
         return 2
     senha = os.getenv("DECIDIU_DEMO_SENHA", "")
     if not args.so_zerar and len(senha) < 6:
