@@ -1,23 +1,100 @@
 import asyncio
+import logging
 import math
+from urllib.parse import parse_qsl
 
 import flet as ft
 
-from database import autenticar_usuario, init_db, listar_projetos_do_usuario, pode_no_projeto
+import tema
+
+from database import autenticar_usuario, definir_tema, init_db, listar_projetos_do_usuario, pode_no_projeto
+from nucleo.db import nova_sessao
+from eventos import TipoEvento, eh_admin, registrar_evento
+from nucleo import planos as regras_planos
+from nucleo.legal import url_termos
+from nucleo.servicos import assinaturas, cadastro
+from views.admin import painel_admin
+from views.planos import build_planos_view
 from views.atas import build_atas_view
+from views.documentos import build_documentos_view
 from views.ficha import build_ficha_view
 from views.login import build_login_view
+from views.pendencias import build_pendencias_view
+from views.plataforma import build_plataforma_view
 from views.sem_projeto import build_sem_projeto_view
 from views.timeline import build_timeline_view
 from seguranca import LimitadorTentativas
 
 # Compartilhado entre todas as sessões: 5 senhas erradas bloqueiam o usuário por 15 min.
 LIMITADOR_LOGIN = LimitadorTentativas(maximo=5, janela_s=900, bloqueio_s=900)
+log = logging.getLogger(__name__)
+
+
+def _confirmar_email_link(token):
+    try:
+        with nova_sessao() as s:
+            cadastro.confirmar_email(s, token)
+        return "E-mail confirmado. Agora é só entrar."
+    except ValueError as erro:
+        return str(erro)
+
+
+async def cadastrar_conta(nome_escritorio, nome_completo, email, senha, aceitou):
+    def fazer():
+        with nova_sessao() as s:
+            usuario = cadastro.cadastrar(s, nome_escritorio, nome_completo, email, senha, aceitou)
+        registrar_evento(TipoEvento.CADASTRO, usuario_id=usuario.id, usuario_email=usuario.email)
+        registrar_evento(TipoEvento.TRIAL_INICIADO, usuario_id=usuario.id)
+    try:
+        await asyncio.to_thread(fazer)  # envia e-mail: não trava a tela
+        return None
+    except ValueError as erro:
+        return str(erro)
+    except Exception:  # erro inesperado: vai para o log completo (Deploy Logs)
+        log.exception("Falha ao criar conta")
+        return ("Não foi possível criar a conta agora. Tente de novo em instantes; "
+                "se continuar, fale com o suporte.")
+
+
+async def pedir_redefinicao(email):
+    def fazer():
+        with nova_sessao() as s:
+            cadastro.esqueci_senha(s, email)
+    try:
+        await asyncio.to_thread(fazer)
+    except Exception:  # a resposta na tela é a mesma, mesmo com falha
+        log.exception("Falha ao pedir redefinição de senha")
+    return None
+
+
+async def gerar_link_assinatura(username, senha, plano, ciclo, cpf_cnpj):
+    """Devolve (link_de_pagamento, None) ou (None, mensagem de erro)."""
+    def fazer():
+        with nova_sessao() as s:
+            return assinaturas.assinar_com_senha(s, username, senha, plano, ciclo, cpf_cnpj)
+    try:
+        return await asyncio.to_thread(fazer), None
+    except ValueError as erro:  # inclui ErroAsaas: a mensagem já é para o usuário
+        return None, str(erro)
+    except Exception:
+        log.exception("Falha ao gerar link de assinatura")
+        return None, "Não foi possível gerar o pagamento agora. Tente de novo ou fale com o suporte."
+
+
+async def redefinir_senha_link(token, senha):
+    def fazer():
+        with nova_sessao() as s:
+            cadastro.redefinir_com_token(s, token, senha)
+    try:
+        await asyncio.to_thread(fazer)
+        return None
+    except ValueError as erro:
+        return str(erro)
 
 
 def main(page: ft.Page):
-    page.title = "Ru.A Estudio - Memória de Projetos"
-    page.theme_mode = ft.ThemeMode.DARK
+    page.title = "Decidiu - Memória de Projetos"
+    tema.configurar(page)  # temas claro e escuro; começa no claro (padrão) até o login
     page.padding = 20
 
     init_db()
@@ -44,6 +121,37 @@ def main(page: ft.Page):
                 abrir_atas,
                 abrir_ficha,
                 projeto_excluido,
+                abrir_pendencias,
+                abrir_plataforma,
+                trocar_tema,
+                on_open_painel=abrir_painel,
+            )
+        )
+
+    def trocar_tema():
+        """Alterna claro/escuro, guarda a escolha do usuário e redesenha a tela atual."""
+        novo = tema.oposto(tema.modo_atual(page))
+        tema.aplicar_modo(page, novo)
+        if usuario_logado is not None:
+            usuario_logado.tema = novo
+            try:
+                definir_tema(usuario_logado.id, novo)
+            except Exception as erro:  # a preferência é conveniência: nunca derruba a tela
+                print(f"[memoria] Não foi possível guardar o tema: {erro}", flush=True)
+        route_change(None)
+
+    def montar_plataforma():
+        mostrar_view(build_plataforma_view(page, usuario_logado, sair, voltar_timeline))
+
+    def montar_pendencias():
+        mostrar_view(
+            build_pendencias_view(
+                page,
+                projeto_ativo,
+                usuario_logado,
+                sair,
+                voltar_timeline,
+                abrir_atas,
             )
         )
 
@@ -55,8 +163,12 @@ def main(page: ft.Page):
                 usuario_logado,
                 sair,
                 voltar_timeline,
+                abrir_documentos,
             )
         )
+
+    def montar_documentos():
+        mostrar_view(build_documentos_view(page, projeto_ativo, usuario_logado, sair, abrir_ficha))
 
     def montar_atas():
         nonlocal ata_para_abrir
@@ -82,10 +194,16 @@ def main(page: ft.Page):
             )
             page.update()
             return
-        usuario = autenticar_usuario(username, senha)
+        try:
+            usuario = autenticar_usuario(username, senha)
+        except PermissionError as erro:  # senha certa, mas assinatura/organização bloqueada
+            mensagem_erro.value = str(erro)
+            page.update()
+            return
         if usuario:
             LIMITADOR_LOGIN.sucesso(chave)
             usuario_logado = usuario
+            tema.aplicar_modo(page, usuario.tema)  # modo escolhido por ele (padrão: claro)
             projetos = listar_projetos_do_usuario(usuario.id)
             projeto_ativo = projetos[0] if projetos else None
             await page.push_route("/timeline")
@@ -121,6 +239,18 @@ def main(page: ft.Page):
     async def abrir_ficha(_=None):
         await page.push_route("/ficha")
 
+    async def abrir_pendencias(_=None):
+        await page.push_route("/pendencias")
+
+    async def abrir_documentos(_=None):
+        await page.push_route("/documentos")
+
+    async def abrir_plataforma(_=None):
+        await page.push_route("/plataforma")
+
+    async def abrir_painel(_=None):
+        await page.push_route("/painel")
+
     async def voltar_timeline(_=None):
         await page.push_route("/timeline")
 
@@ -147,11 +277,47 @@ def main(page: ft.Page):
         projeto_ativo = projeto
 
     def route_change(_):
+        caminho, _, consulta = (page.route or "/login").partition("?")
+        params = dict(parse_qsl(consulta))
         if usuario_logado is None:
-            if page.route != "/login":
+            if caminho == "/planos":
+                try:
+                    with nova_sessao() as s:
+                        vagas = regras_planos.vagas_fundador_restantes(s)
+                except Exception:
+                    vagas = None
+
+                async def voltar_login():
+                    await page.push_route("/login")
+
+                mostrar_view(build_planos_view(
+                    page, gerar_link_assinatura,
+                    lambda: asyncio.create_task(voltar_login()),
+                    url_termos=url_termos(), vagas_fundador=vagas,
+                ))
+                return
+            if caminho != "/login":
                 asyncio.create_task(page.push_route("/login"))
                 return
-            mostrar_view(build_login_view(fazer_login, page))
+            aviso = _confirmar_email_link(params["confirmar"]) if params.get("confirmar") else None
+            mostrar_view(build_login_view(
+                fazer_login, page,
+                on_cadastro=cadastrar_conta,
+                on_esqueci=pedir_redefinicao,
+                on_redefinir=redefinir_senha_link,
+                token_redefinir=params.get("token"),
+                aviso=aviso,
+            ))
+        elif page.route == "/plataforma":
+            montar_plataforma()  # não depende de projeto; a própria tela confere o superadmin
+        elif page.route == "/painel":
+            # Não depende de projeto. A checagem de administrador é feita dentro de painel_admin.
+            mostrar_view(ft.View(
+                route="/painel",
+                scroll=ft.ScrollMode.AUTO,
+                controls=[painel_admin(page, usuario_logado.id,
+                                       usuario_logado.email or usuario_logado.username)],
+            ))
         elif not garantir_projeto_valido():
             mostrar_view(
                 build_sem_projeto_view(page, usuario_logado, sair, projeto_criado)
@@ -162,6 +328,10 @@ def main(page: ft.Page):
             montar_atas()
         elif page.route == "/ficha":
             montar_ficha()
+        elif page.route == "/pendencias":
+            montar_pendencias()
+        elif page.route == "/documentos":
+            montar_documentos()
         else:
             asyncio.create_task(page.push_route("/timeline"))
 

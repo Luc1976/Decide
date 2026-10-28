@@ -6,6 +6,90 @@ dependências e roda o app, mas **não guarda dados**. As informações ficam em
 **volume persistente do servidor**: o banco `memoria_projetos.db` (SQLite) e os anexos.
 Tudo fica na pasta definida por `MEMORIA_DATA_DIR` (no Docker: `/dados`).
 
+## Usar o PostgreSQL do Railway (banco novo)
+1. O PostgreSQL e o serviço do app precisam estar no **mesmo projeto e no mesmo ambiente** do
+   Railway (o endereço `postgres.railway.internal` só funciona lá dentro).
+2. No serviço do PostgreSQL: confira que está **Active** e deixe o *App Sleeping* desligado.
+3. No serviço do app, crie as variáveis **antes** de publicar (o primeiro usuário só é criado
+   num banco vazio, na primeira partida):
+   - `DECIDIU_DATABASE_URL` = `${{Postgres.DATABASE_URL}}` (referência, não cole o endereço;
+     troque `Postgres` pelo nome do serviço do banco);
+   - `MEMORIA_ADMIN_USUARIO` = `lucas` e `MEMORIA_ADMIN_SENHA` = a senha que você quer (6+ caracteres).
+     Sem a senha, uma senha aleatória aparece **uma vez** no log;
+   - `DECIDIU_ORG_INICIAL` = nome do escritório (ex.: `Ru.A Estúdio`).
+4. No log da partida deve aparecer:
+   `[memoria] Banco: postgresql+psycopg://...:***@postgres.railway.internal:5432/...` e depois
+   `[memoria] Banco atualizado: versão sem versão -> 0002`.
+5. Se o banco não responder, o app tenta por ~90 s e então escreve no log as causas prováveis.
+   Para voltar ao SQLite, apague `DECIDIU_DATABASE_URL`.
+
+O volume `/dados` continua necessário: anexos, logos e PDFs ainda ficam nele.
+
+## Atualização com organizações e Alembic (fazer uma vez)
+Esta versão muda a estrutura do banco na primeira partida (migrações do Alembic):
+cria a tabela de organizações e coloca todos os usuários e projetos atuais numa organização só.
+Ninguém perde acesso, mas faça assim:
+
+1. **Backup antes**: copie o `memoria_projetos.db` (e a pasta `/dados` inteira) do volume.
+2. No Railway, defina `DECIDIU_ORG_INICIAL` com o nome do escritório (ex.: `Ru.A Estúdio`).
+   Sem ela, o nome fica "Organização principal" (dá para trocar depois pela API).
+3. Rode `uv lock` no PC e publique (entraram `alembic`, `pyjwt` e `psycopg`).
+4. No log da partida deve aparecer `[memoria] Banco atualizado: versão sem versão -> 0002`.
+   Nas partidas seguintes essa linha não aparece (não há nada a aplicar). Para conferir:
+   `alembic current` no terminal do serviço (deve mostrar `0002 (head)`).
+
+O administrador mais antigo (o usuário inicial) vira também **superadmin**.
+
+## Tela principal (linha do tempo)
+Pensada para o celular: a linha do tempo ocupa quase toda a tela.
+- Barra superior: ☰ (menu), nome do projeto e o seu nível de acesso.
+- Logo abaixo: **Buscar decisões**, **+ Nova Decisão** e **Atas de Reunião**.
+- Menu lateral (☰): troca de projeto, Pendências (com a contagem), Ficha, Relatório PDF,
+  gestão do projeto (novo, editar, membros, excluir), administração (usuários, logo,
+  plataforma) e conta (modo claro/escuro, senha, sair). Cada item só aparece para quem tem
+  permissão, como antes.
+
+## Documentos de referência
+Na **Ficha do Empreendimento**, botão **Documentos de referência (x/y)** (recebidos / aplicáveis).
+Checklist dos arquivos e informações recebidas do cliente. Todo projeto já vem com:
+Levantamento topográfico, Projetos preliminares, Layout, Relatórios de Sondagens SPT,
+Relatório de sondagem a trado (CBR), BEP / EIR e Outros (os projetos que já existiam ganham a
+lista na migração 0004; a 0005 dá data a cada arquivo).
+- Situação de cada item: **Recebido**, **Pendente** ou **N/A** (não aplicável). Ao marcar
+  Recebido, o app guarda a data e quem marcou.
+- **Anexar arquivo** pede a **data de recebimento** (hoje, já preenchido; pode ser anterior,
+  nunca futura), guarda o arquivo no item e, se ele ainda estava pendente, marca como Recebido
+  nessa data. Cada arquivo mostra quando foi recebido (ícone de calendário corrige a data).
+  A data do item também pode ser corrigida em **Editar**. Observação livre
+  (ex.: "revisão R02, enviada por e-mail").
+- **PDF**: botão na própria tela gera a lista com situação, datas e arquivos recebidos.
+  No **Relatório de Decisões** a mesma tabela entra como seção (caixa "Incluir os documentos
+  de referência", marcada por padrão).
+- **+ Novo Item** acrescenta outras informações. Itens acrescentados podem ser renomeados e
+  excluídos; os da lista padrão não (marque N/A quando não se aplicarem).
+- O cliente (Leitor) acompanha a lista e baixa os arquivos, mas não altera.
+
+## Aparência: modo claro e escuro
+No menu lateral (☰), item "Modo claro" / "Modo escuro". A escolha fica guardada **no usuário**
+(vale em qualquer aparelho) e o padrão continua sendo o modo escuro. A migração 0003 cria essa
+preferência sozinha na partida (log: `Banco atualizado: versão 0002 -> 0003`).
+
+- Cores das telas: definidas em `tema.py`. Nas telas, use as cores "por papel" do tema
+  (`ft.Colors.ON_SURFACE_VARIANT`, `PRIMARY`, `ERROR`...), nunca cores fixas como `GREY_400`:
+  elas somem num dos modos. O teste `tests/test_tema.py` acusa se alguma cor fixa voltar.
+- Selos (disciplina, impacto, situação): texto escuro sobre fundo em tom médio, contraste ≥ 7.
+
+## Plataforma: organizações (só o superadmin)
+Botão **Plataforma** no cabeçalho da linha do tempo (só aparece para o superadmin).
+- **+ Nova Organização**: nome do escritório e o primeiro administrador (nome, usuário e senha
+  inicial). Envie ao administrador o endereço, o usuário e, por outro canal, a senha; ele troca a
+  senha em "Minha conta" e cadastra a equipe em "Usuários".
+- A lista mostra a situação, quantos usuários e projetos cada organização tem e desde quando.
+  Só contagens: os projetos dos escritórios continuam invisíveis para a plataforma.
+- **Suspender**: ninguém da organização entra (quem estiver com o app aberto perde o acesso na
+  hora). Os dados ficam guardados. **Reativar** devolve o acesso. A sua organização não pode ser
+  suspensa.
+
 ## Como funciona
 - O Python roda no servidor e o navegador é só a tela (Flet em modo web). Todos
   os usuários compartilham o mesmo banco.
@@ -41,9 +125,38 @@ categoria e impacto, a ficha com os indicadores calculados e as decisões em ord
 No site, depois de gerar toque em **Baixar PDF** (o link vale 15 minutos). Os arquivos ficam em
 `/dados/relatorios` e são apagados automaticamente depois de 24 horas.
 
+**Logotipos no cabeçalho**: o relatório e o PDF das atas trazem, no alto de todas as páginas, o
+logo da empresa (à esquerda) e o logo do cliente do projeto (à direita), quando cadastrados.
+- Logo da empresa: botão com ícone de prédio no topo da tela (só administradores). Vale para
+  todos os projetos.
+- Logo do cliente: **Editar Projeto** → "Logo do cliente" (Responsável pelo projeto).
+
+Aceita PNG, JPG, WEBP, GIF ou BMP de até 5 MB; a imagem é reduzida e guardada como PNG em
+`/dados/logos`. PNG com fundo transparente fica melhor. Sem logos, o PDF sai como antes.
+
 Limites: o PDF usa a fonte padrão (Helvetica). Letras acentuadas e m² funcionam; emojis e símbolos
 fora do alfabeto latino viram "?". Esta função exige o pacote `reportlab` (já está no
 `pyproject.toml`; rode `uv lock` de novo antes de publicar).
+
+## Pendências de decisão
+Botão **Pendências** na linha do tempo (o número entre parênteses é quantas estão em aberto).
+Lista os assuntos que ainda aguardam decisão, com responsável, prazo (vencidos aparecem em
+vermelho) e origem.
+
+Como uma pendência entra:
+- **Manualmente**: **+ Nova Pendência** (Editor ou Responsável).
+- **Pelas atas**: no texto da ata, comece a linha com `[P]` (ex.: `[P] Definir fornecedor das
+  esquadrias`). Ao **fechar** a ata, cada linha `[P]` vira uma pendência ligada a ela. O rascunho
+  gerado por IA a partir da transcrição já traz os assuntos sem decisão como linhas `[P]`: revise,
+  apague ou ajuste antes de fechar. A IA também recebe a lista de pendências em aberto, para não
+  repeti-las e para apontar (com o código P-xxx no título da decisão) quando uma delas foi decidida.
+
+Como uma pendência sai:
+- **Resolver**: registra a decisão na hora (vira um D-xxx na linha do tempo) ou liga a uma decisão
+  já registrada.
+- **Cancelar**: quando o assunto deixou de precisar de decisão (pede o motivo).
+Resolvidas e canceladas continuam no histórico (filtro **Situação**) e podem ser reabertas.
+Leitores (clientes) veem a lista, mas não alteram.
 
 ## Acesso e permissões (usuários externos)
 Cada projeto tem seus próprios membros. Ninguém vê projetos dos quais não faz parte.
@@ -51,7 +164,7 @@ Cada projeto tem seus próprios membros. Ninguém vê projetos dos quais não fa
 | Acesso | Quem é | O que pode |
 |---|---|---|
 | **Leitor** | cliente que acompanha | ver decisões, atas **fechadas** (rascunhos ficam ocultos) e a ficha; abrir anexos |
-| **Editor** | equipe / terceiro | tudo do Leitor + registrar decisões e atas, alterar a ficha |
+| **Editor** | equipe / terceiro | tudo do Leitor + registrar decisões, atas e pendências, alterar a ficha |
 | **Responsável** | dono do projeto | tudo do Editor + editar o projeto, gerenciar os membros e **excluir o projeto** |
 | **Administrador** | você | acessa todos os projetos e cadastra usuários |
 

@@ -9,11 +9,17 @@ authors = [
 dependencies = [
     "flet",
     "flet-web",   # servidor web (necessário para publicar como site)
-    "fastapi",
+    "fastapi==0.142.2",  # fixado: flet-web 1.0.3 passa openapi_prefix, que versões mais novas do FastAPI removeram
     "uvicorn[standard]",
     "sqlmodel",
-    "reportlab"   # relatório de decisões em PDF
+    "reportlab",  # relatório de decisões em PDF
+    "pyjwt>=2.8",              # tokens de acesso da API (api/)
+    "alembic>=1.13",           # migrações do banco (migracoes/)
+    "psycopg[binary]>=3.2",    # PostgreSQL (só com DECIDIU_DATABASE_URL)
 ]
+
+[project.optional-dependencies]
+testes = ["pytest>=8", "httpx>=0.27"]
 
 [dependency-groups]
 dev = [

@@ -39,6 +39,8 @@ COR_IMPACTO = {
     "Baixo": colors.HexColor("#1B7F3B"),
 }
 
+COR_SITUACAO_DOC = {"Recebido": "#1B7F3B", "Pendente": "#9A6700", "N/A": "#5F6B7A"}
+
 _SUBSTITUICOES = {
     "→": "->", "←": "<-", "≥": ">=", "≤": "<=", "≠": "!=", "✓": "[x]", "✔": "[x]",
     "☐": "[ ]", "☑": "[x]", "•": "-", "…": "...", "\u00a0": " ", "\u200b": "",
@@ -114,8 +116,56 @@ def _tabela_chave_valor(linhas, estilos, larguras=(5.2 * cm, 11.8 * cm)):
     return tabela
 
 
-def _canvas_com_rodape(texto_esquerda: str):
-    """Canvas que escreve 'Página X de Y' (precisa saber o total, então grava as páginas antes)."""
+# Cabeçalho com logotipos: logo da empresa à esquerda, logo do cliente à direita.
+ALTURA_LOGO = 1.5 * cm
+LARGURA_MAX_LOGO = 6 * cm
+TOPO_LOGO = 1.0 * cm  # distância do topo da folha até o alto dos logos
+
+
+def _ler_logos(logo_empresa=None, logo_cliente=None):
+    """(ImageReader ou None, ImageReader ou None). Imagem ausente ou ilegível é ignorada:
+    um logo com problema nunca impede o PDF de sair."""
+    from reportlab.lib.utils import ImageReader
+
+    def ler(caminho):
+        if not caminho or not Path(caminho).is_file():
+            return None
+        try:
+            imagem = ImageReader(str(caminho))
+            imagem.getSize()
+            return imagem
+        except Exception:
+            return None
+
+    return ler(logo_empresa), ler(logo_cliente)
+
+
+def margem_superior(logos, padrao=2 * cm) -> float:
+    """Com logos, o texto começa abaixo do cabeçalho; sem eles, fica como antes."""
+    return TOPO_LOGO + ALTURA_LOGO + 0.9 * cm if any(logos or ()) else padrao
+
+
+def _desenhar_logos(tela, logos, largura_pagina, altura_pagina) -> None:
+    empresa, cliente = logos
+    if not (empresa or cliente):
+        return
+    base = altura_pagina - TOPO_LOGO - ALTURA_LOGO
+    for imagem, alinhar_direita in ((empresa, False), (cliente, True)):
+        if imagem is None:
+            continue
+        largura, altura = imagem.getSize()
+        escala = min(ALTURA_LOGO / altura, LARGURA_MAX_LOGO / largura)
+        w, h = largura * escala, altura * escala
+        x = largura_pagina - 2 * cm - w if alinhar_direita else 2 * cm
+        y = base + (ALTURA_LOGO - h) / 2  # centraliza na faixa do cabeçalho
+        tela.drawImage(imagem, x, y, width=w, height=h, mask="auto")
+    tela.setStrokeColor(colors.HexColor("#D5DAE1"))
+    tela.line(2 * cm, base - 0.3 * cm, largura_pagina - 2 * cm, base - 0.3 * cm)
+
+
+def _canvas_com_rodape(texto_esquerda: str, logos=(None, None)):
+    """Canvas que escreve 'Página X de Y' (precisa saber o total, então grava as páginas antes)
+    e, se houver, os logotipos no cabeçalho de todas as páginas."""
 
     class _Numerado(canvas.Canvas):
         def __init__(self, *args, **kwargs):
@@ -130,6 +180,7 @@ def _canvas_com_rodape(texto_esquerda: str):
             total = len(self._estados)
             for estado in self._estados:
                 self.__dict__.update(estado)
+                _desenhar_logos(self, logos, *self._pagesize)
                 self.setFont("Helvetica", 8)
                 self.setFillColor(CINZA)
                 self.drawString(2 * cm, 1.2 * cm, _limpo(texto_esquerda)[:95])
@@ -199,6 +250,85 @@ def _bloco_decisao(decisao, estilos, atas_por_id, alteracoes, incluir_detalhes):
     return [CondPageBreak(4.5 * cm), KeepTogether(primeiro)] + resto + [Spacer(1, 6), HRFlowable(width="100%", thickness=0.3, color=colors.HexColor("#D5DAE1")), Spacer(1, 4)]
 
 
+def nome_do_arquivo_documentos(projeto_nome: str, quando: datetime) -> str:
+    return nome_do_arquivo(projeto_nome, quando).replace("Relatorio-decisoes-", "Documentos-referencia-", 1)
+
+
+def _resumo_documentos(documentos) -> str:
+    situacoes = [d.situacao for d, _ in documentos]
+    aplicaveis = len(situacoes) - situacoes.count("N/A")
+    texto = f"{situacoes.count('Recebido')} de {aplicaveis} recebidos · {situacoes.count('Pendente')} pendente(s)"
+    if situacoes.count("N/A"):
+        texto += f" · {situacoes.count('N/A')} não se aplica(m)"
+    return texto
+
+
+def _secao_documentos(documentos, estilos, com_titulo: bool = True):
+    """Tabela do checklist. documentos: [(documento, [arquivos])], cada arquivo com nome e
+    data_recebimento. Uma linha por item; os arquivos aparecem com a data em que chegaram."""
+    if not documentos:
+        return []
+    elementos = []
+    if com_titulo:  # no PDF próprio o resumo já está no quadro do topo
+        elementos += _titulo_secao("Documentos de referência", estilos, 5 * cm)
+        elementos += [Paragraph(_p(_resumo_documentos(documentos)), estilos["pequeno"]), Spacer(1, 4)]
+    cabecalho = [Paragraph(f'<font color="#FFFFFF"><b>{t}</b></font>', estilos["rotulo"])
+                 for t in ("Documento / informação", "Situação", "Recebido em", "Arquivos recebidos")]
+    linhas = [cabecalho]
+    for doc, arquivos in documentos:
+        nome = f"<b>{_p(doc.nome)}</b>"
+        if doc.observacao:
+            nome += f'<br/><font size="8" color="#5F6B7A">{_p(doc.observacao)}</font>'
+        cor = COR_SITUACAO_DOC.get(doc.situacao, "#5F6B7A")
+        situacao = f'<font color="{cor}"><b>{_p("Não se aplica" if doc.situacao == "N/A" else doc.situacao)}</b></font>'
+        quando = f"{doc.data_recebimento:%d/%m/%Y}" if doc.situacao == "Recebido" and doc.data_recebimento else "-"
+        lista = "<br/>".join(f"{_p(a.nome)} <font color=\"#5F6B7A\">({a.data_recebimento:%d/%m/%Y})</font>"
+                             for a in arquivos) or "-"
+        linhas.append([Paragraph(nome, estilos["rotulo"]), Paragraph(situacao, estilos["rotulo"]),
+                       Paragraph(quando, estilos["rotulo"]), Paragraph(lista, estilos["rotulo"])])
+    tabela = Table(linhas, colWidths=[5.3 * cm, 2.3 * cm, 2.7 * cm, 6.7 * cm], repeatRows=1)
+    estilo = [
+        ("BACKGROUND", (0, 0), (-1, 0), AZUL),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.HexColor("#D5DAE1")),
+        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]
+    estilo += [("BACKGROUND", (0, i), (-1, i), CINZA_CLARO) for i in range(2, len(linhas), 2)]
+    tabela.setStyle(TableStyle(estilo))
+    elementos.append(tabela)
+    return elementos
+
+
+def gerar_documentos_pdf(destino: Path, projeto, documentos, gerado_por: str, nome_app: str = "Decidiu",
+                         agora: datetime = None, logo_empresa=None, logo_cliente=None) -> int:
+    """PDF só com o checklist de documentos de referência. Devolve quantos itens entraram."""
+    agora = agora or datetime.now()
+    estilos = _estilos()
+    logos = _ler_logos(logo_empresa, logo_cliente)
+    story = [
+        Paragraph("Documentos de Referência", estilos["titulo"]),
+        Paragraph(_p(projeto.nome), estilos["subtitulo"]),
+        _tabela_chave_valor(
+            [("Cliente", projeto.cliente),
+             ("Gerado em", f"{agora:%d/%m/%Y às %H:%M}"),
+             ("Gerado por", gerado_por),
+             ("Situação", _resumo_documentos(documentos) if documentos else "Nenhum item")],
+            estilos,
+        ),
+        Spacer(1, 10),
+        *_secao_documentos(documentos, estilos, com_titulo=False),
+    ]
+    destino = Path(destino)
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    documento = SimpleDocTemplate(
+        str(destino), pagesize=A4, leftMargin=2 * cm, rightMargin=2 * cm, topMargin=margem_superior(logos),
+        bottomMargin=2.3 * cm, title=_limpo(f"Documentos de Referência - {projeto.nome}"),
+        author=_limpo(gerado_por), subject=_limpo(nome_app),
+    )
+    documento.build(story, canvasmaker=_canvas_com_rodape(f"{nome_app}  |  {projeto.nome}", logos))
+    return len(documentos)
+
+
 def _secao_ficha(caracteristicas, estilos):
     por_chave = {(c.grupo, c.nome): c for c in caracteristicas if (c.valor or "").strip()}
     if not por_chave:
@@ -235,12 +365,18 @@ def gerar_relatorio_pdf(
     filtros_texto: str = "Todas as decisões",
     incluir_ficha: bool = True,
     incluir_detalhes: bool = True,
-    nome_app: str = "Memória de Projetos",
+    nome_app: str = "Decidiu",
     agora: datetime = None,
+    logo_empresa=None,
+    logo_cliente=None,
+    documentos=None,
 ) -> int:
-    """Grava o PDF em 'destino' e devolve quantas decisões entraram."""
+    """Grava o PDF em 'destino' e devolve quantas decisões entraram.
+    logo_empresa / logo_cliente: caminhos de imagens para o cabeçalho (opcionais).
+    documentos: [(documento, [arquivos])] para a seção Documentos de referência (opcional)."""
     agora = agora or datetime.now()
     estilos = _estilos()
+    logos = _ler_logos(logo_empresa, logo_cliente)
     decisoes = sorted(decisoes, key=lambda d: (d.data_decisao, d.numero or 0, d.id or 0))
 
     story = [
@@ -272,6 +408,8 @@ def gerar_relatorio_pdf(
 
     if incluir_ficha:
         story += _secao_ficha(caracteristicas, estilos)
+    if documentos:
+        story += _secao_documentos(documentos, estilos)
 
     story += _titulo_secao("Decisões (ordem cronológica)", estilos, 7 * cm)
     if not decisoes:
@@ -282,8 +420,8 @@ def gerar_relatorio_pdf(
     destino = Path(destino)
     destino.parent.mkdir(parents=True, exist_ok=True)
     documento = SimpleDocTemplate(
-        str(destino), pagesize=A4, leftMargin=2 * cm, rightMargin=2 * cm, topMargin=2 * cm, bottomMargin=2.3 * cm,
+        str(destino), pagesize=A4, leftMargin=2 * cm, rightMargin=2 * cm, topMargin=margem_superior(logos), bottomMargin=2.3 * cm,
         title=_limpo(f"Relatório de Decisões - {projeto.nome}"), author=_limpo(gerado_por), subject=_limpo(nome_app),
     )
-    documento.build(story, canvasmaker=_canvas_com_rodape(f"{nome_app}  |  {projeto.nome}"))
+    documento.build(story, canvasmaker=_canvas_com_rodape(f"{nome_app}  |  {projeto.nome}", logos))
     return len(decisoes)

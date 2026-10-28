@@ -1,18 +1,16 @@
 """Rascunho de ata a partir da transcrição de uma reunião (Teams, etc.) usando IA.
 
 A IA NUNCA registra nada sozinha: ela devolve sugestões, este módulo as transforma em um
-texto de ata com linhas [D] (decisão) e [F] (ficha), e uma pessoa revisa, edita e fecha a ata
-no editor de sempre.
+texto de ata com linhas [D] (decisão), [F] (ficha) e [P] (assunto pendente de decisão), e uma
+pessoa revisa, edita e fecha a ata no editor de sempre.
 
 Configuração (variáveis de ambiente, só no servidor; a chave nunca vai para o navegador):
   ANTHROPIC_API_KEY        chave da API da Anthropic (ou MEMORIA_ANTHROPIC_API_KEY).
   MEMORIA_ANTHROPIC_WORKSPACE_ID  ID do workspace (wrkspc_...), se a chave não for de workspace.
   MEMORIA_IA_MODELO        modelo (padrão claude-sonnet-5-5; claude-haiku-5-5 é mais barato).
-  MEMORIA_IA_LIMITE_MES    máximo de transcrições por projeto por mês (padrão 30; 0 = sem limite).
 
 Só usa a biblioteca padrão do Python (urllib): não precisa instalar nada novo.
 """
-import datetime
 import json
 import os
 import re
@@ -26,7 +24,6 @@ from ficha_calculos import localizar_campo
 API_URL = "https://api.anthropic.com/v1/messages"
 API_VERSION = "2023-06-01"
 MODELO_PADRAO = "claude-sonnet-5-5"
-LIMITE_MES_PADRAO = 30
 # Reuniões longas são divididas em blocos para não estourar o limite de resposta.
 TAMANHO_BLOCO = 120_000  # caracteres (~30 mil tokens)
 MAX_TRANSCRICAO = 600_000  # caracteres; acima disso o usuário deve dividir a reunião
@@ -57,55 +54,6 @@ def _workspace() -> str:
 
 def _modelo() -> str:
     return (os.getenv("MEMORIA_IA_MODELO") or MODELO_PADRAO).strip()
-
-
-def _limite_mes() -> int:
-    try:
-        return int(os.getenv("MEMORIA_IA_LIMITE_MES") or LIMITE_MES_PADRAO)
-    except ValueError:
-        return LIMITE_MES_PADRAO
-
-
-# ---------------------------------------------------------------- limite de uso
-
-def _arquivo_uso():
-    return config.DATA_DIR / "uso_ia.json"
-
-
-def _mes() -> str:
-    return datetime.date.today().strftime("%Y-%m")
-
-
-def _ler_uso() -> dict:
-    try:
-        return json.loads(_arquivo_uso().read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return {}
-
-
-def usos_no_mes(projeto_id) -> int:
-    return int(_ler_uso().get(_mes(), {}).get(str(projeto_id), 0))
-
-
-def conferir_limite(projeto_id) -> None:
-    limite = _limite_mes()
-    if limite and usos_no_mes(projeto_id) >= limite:
-        raise ErroIA(
-            f"Este projeto atingiu o limite de {limite} transcrições neste mês. "
-            "Escreva a ata manualmente ou peça ao administrador para aumentar o limite."
-        )
-
-
-def registrar_uso(projeto_id) -> None:
-    uso = _ler_uso()
-    mes = uso.setdefault(_mes(), {})
-    mes[str(projeto_id)] = int(mes.get(str(projeto_id), 0)) + 1
-    for antigo in sorted(uso)[:-3]:  # guarda só os últimos meses
-        uso.pop(antigo, None)
-    try:
-        _arquivo_uso().write_text(json.dumps(uso), encoding="utf-8")
-    except OSError:
-        pass  # contagem é best-effort
 
 
 # ---------------------------------------------------------------- limpeza da transcrição
@@ -179,7 +127,9 @@ SISTEMA = """Você é secretário(a) técnico(a) de uma equipe de projetos de ar
 Recebe a transcrição de uma reunião e o contexto do projeto, e propõe o que deve entrar na ata.
 Regras:
 - Responda SOMENTE com um objeto JSON válido, sem texto antes ou depois e sem cercas de código.
-- Só inclua DECISÕES realmente tomadas na reunião. Dúvidas, ideias em discussão e tarefas sem decisão vão em "pendencias".
+- Só inclua DECISÕES realmente tomadas na reunião. Assuntos discutidos que ficaram SEM decisão (dúvidas, alternativas em estudo, itens que dependem de resposta de alguém) vão em "pendencias".
+- Cada pendência é um assunto que precisa ser decidido depois, escrito como uma frase curta; inclua quem deve trazer a resposta e o prazo, se forem citados.
+- Se a reunião decidiu um dos assuntos pendentes informados no contexto, registre-o em "decisoes" e comece o título com o código dele (ex.: "P-003: ..."); não o repita em "pendencias".
 - Não invente nada que não esteja na transcrição. Se não houver responsável ou prazo, use "".
 - "trecho" é uma frase curta (até 200 caracteres) copiada da transcrição que sustenta o item.
 - "alteracoes_ficha" só quando a reunião fixou ou mudou um dado da ficha do empreendimento; "campo" deve ser um dos nomes de campo informados no contexto.
@@ -264,7 +214,7 @@ def _extrair_json(texto: str) -> dict:
     raise ErroIA("Não consegui interpretar a resposta da IA. Tente novamente.")
 
 
-def _contexto(projeto_nome, categorias, impactos, campos_ficha, decisoes_recentes) -> str:
+def _contexto(projeto_nome, categorias, impactos, campos_ficha, decisoes_recentes, pendencias_abertas=()) -> str:
     linhas = [f"Projeto: {projeto_nome}", f"Categorias: {', '.join(categorias)}"]
     linhas.append(f"Impactos: {', '.join(impactos)}")
     nomes = [c[1] for c in campos_ficha]
@@ -273,6 +223,9 @@ def _contexto(projeto_nome, categorias, impactos, campos_ficha, decisoes_recente
     if decisoes_recentes:
         linhas.append("Decisões já registradas (não repita as que forem iguais):")
         linhas += [f"- {d}" for d in decisoes_recentes[-30:]]
+    if pendencias_abertas:
+        linhas.append("Assuntos pendentes de decisão, em aberto (não repita os mesmos assuntos):")
+        linhas += [f"- {p}" for p in list(pendencias_abertas)[:40]]
     return "\n".join(linhas)
 
 
@@ -282,10 +235,23 @@ def _uma_linha(texto) -> str:
     return " ".join(str(texto or "").split())
 
 
+def _texto_pendencia(item) -> str:
+    """A IA às vezes devolve a pendência como objeto em vez de texto: aceita os dois."""
+    if isinstance(item, dict):
+        assunto = _uma_linha(item.get("assunto") or item.get("titulo") or item.get("descricao"))
+        extras = [
+            f"{rotulo}: {_uma_linha(item.get(chave))}"
+            for chave, rotulo in (("responsavel", "responsável"), ("prazo", "prazo"))
+            if _uma_linha(item.get(chave))
+        ]
+        return f"{assunto} ({'; '.join(extras)})" if assunto and extras else assunto
+    return _uma_linha(item)
+
+
 def _juntar(resultados: list) -> dict:
     """Une as respostas de vários blocos, sem repetir decisões iguais."""
     junto = {"resumo": [], "decisoes": [], "alteracoes_ficha": [], "pendencias": []}
-    vistos = set()
+    vistos, pendencias_vistas = set(), set()
     for r in resultados:
         if r.get("resumo"):
             junto["resumo"].append(_uma_linha(r["resumo"]))
@@ -295,7 +261,11 @@ def _juntar(resultados: list) -> dict:
                 vistos.add(chave)
                 junto["decisoes"].append(d)
         junto["alteracoes_ficha"] += r.get("alteracoes_ficha") or []
-        junto["pendencias"] += r.get("pendencias") or []
+        for p in r.get("pendencias") or []:
+            texto = _texto_pendencia(p)
+            if texto and texto.casefold() not in pendencias_vistas:
+                pendencias_vistas.add(texto.casefold())
+                junto["pendencias"].append(texto)
     junto["resumo"] = " ".join(junto["resumo"])
     return junto
 
@@ -335,7 +305,17 @@ def montar_texto_ata(dados: dict, campos_ficha: list, categorias, impactos):
         titulo, descricao = _uma_linha(d.get("titulo")), _uma_linha(d.get("descricao"))
         if not (titulo or descricao):
             continue
-        linha = f"[D] {titulo}: {descricao}" if titulo and descricao else f"[D] {titulo or descricao}"
+        categoria, impacto = _uma_linha(d.get("categoria")), _uma_linha(d.get("impacto"))
+        # formato da linha: [D] (Disciplina) (Impacto) Título: descrição
+        marcas = []
+        if categoria in categorias:
+            marcas.append(f"({categoria})")
+        if impacto in impactos:
+            marcas.append(f"({impacto})")
+        if len(marcas) < 2:
+            avisos.append(f"Decisão \"{titulo or descricao}\": escolha a disciplina e o impacto na linha [D].")
+        texto_linha = f"{titulo}: {descricao}" if titulo and descricao else (titulo or descricao)
+        linha = "[D] " + " ".join(marcas + [texto_linha]).strip()
         extras = []
         if _uma_linha(d.get("responsavel")):
             extras.append(f"responsável: {_uma_linha(d['responsavel'])}")
@@ -344,20 +324,14 @@ def montar_texto_ata(dados: dict, campos_ficha: list, categorias, impactos):
         if extras:
             linha += " (" + "; ".join(extras) + ")"
         linhas.append(linha)
-        categoria, impacto = _uma_linha(d.get("categoria")), _uma_linha(d.get("impacto"))
-        detalhes = []
-        if categoria in categorias:
-            detalhes.append(f"sugestão de categoria: {categoria}")
-        if impacto in impactos:
-            detalhes.append(f"impacto sugerido: {impacto}")
-        if detalhes:
-            linhas.append("   " + "; ".join(detalhes))
         if _uma_linha(d.get("trecho")):
             linhas.append(f"   Trecho: \"{_uma_linha(d['trecho'])}\"")
 
-    pendencias = [_uma_linha(p) for p in dados.get("pendencias") or [] if _uma_linha(p)]
+    pendencias = [_texto_pendencia(p) for p in dados.get("pendencias") or []]
+    pendencias = [p for p in pendencias if p]
     if pendencias:
-        linhas += ["", "Pendências (sem decisão)"] + [f"- {p}" for p in pendencias]
+        # Linhas [P] viram registros na tela de Pendências quando a ata é fechada.
+        linhas += ["", "Pendências (assuntos sem decisão)"] + [f"[P] {p}" for p in pendencias]
     if not decisoes and not cabecalho_f:
         avisos.append("A IA não encontrou decisões nesta transcrição.")
     return "\n".join(linhas), avisos
@@ -372,6 +346,7 @@ def gerar_rascunho(
     campos_ficha: list,
     decisoes_recentes: Optional[list] = None,
     chamar: Optional[Callable[[str, str], str]] = None,
+    pendencias_abertas: Optional[list] = None,
 ) -> dict:
     """Gera o rascunho da ata. Devolve {"texto", "participantes", "avisos"}.
     'chamar' (sistema, usuario) -> texto existe para testes; em produção usa a API."""
@@ -383,18 +358,17 @@ def gerar_rascunho(
     if chamar is None:
         if not ia_configurada():
             raise ErroIA("A IA não está configurada neste servidor (falta a chave ANTHROPIC_API_KEY).")
-        conferir_limite(projeto_id)
         chamar = _chamar_api
 
-    contexto = _contexto(projeto_nome, categorias, impactos, campos_ficha, decisoes_recentes or [])
+    contexto = _contexto(
+        projeto_nome, categorias, impactos, campos_ficha, decisoes_recentes or [], pendencias_abertas or []
+    )
     blocos = dividir_em_blocos(limpo)
     resultados = []
     for i, bloco in enumerate(blocos, 1):
         parte = f" (parte {i} de {len(blocos)})" if len(blocos) > 1 else ""
         pedido = f"{contexto}\n\nTranscrição{parte}:\n<transcricao>\n{bloco}\n</transcricao>"
         resultados.append(_extrair_json(chamar(SISTEMA, pedido)))
-    if chamar is _chamar_api:
-        registrar_uso(projeto_id)
 
     texto, avisos = montar_texto_ata(_juntar(resultados), campos_ficha, categorias, impactos)
     return {"texto": texto, "participantes": participantes, "avisos": avisos}

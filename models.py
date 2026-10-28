@@ -1,11 +1,19 @@
 """Opções de domínio usadas na memória de decisões."""
 
-from enum import Enum
-from typing import Optional
-
-from sqlmodel import Field, SQLModel
-
-CATEGORIAS = ("Arquitetura", "Estrutura", "instalações", "Orçamento", "Geral")
+CATEGORIAS = (
+    "Arquitetura",
+    "Arquitetura de Interiores",
+    "Estrutura",
+    "Fundações",
+    "instalações",
+    "Elétrica",
+    "Hidrossanitário",
+    "HVAC",
+    "PPCI",
+    "Urbanismo",
+    "Orçamento",
+    "Geral",
+)
 IMPACTOS = ("Alto", "Médio", "Baixo")
 
 
@@ -65,33 +73,5 @@ NIVEL_ADMIN = 4
 
 
 # --- Padrão construtivo (campos específicos por tipologia) ---
-class TipologiaProjeto(str, Enum):
-    industrial = "Industrial"
-    multifamiliar = "Multifamiliar"
-    corporativo = "Corporativo"
-    shopping = "Shopping Center"
-    datacenter = "Data Center"
-
-
-class PadraoConstrutivo(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    projeto_id: int = Field(foreign_key="projeto.id", index=True)
-    tipologia: str
-
-    # Campos industriais (nulos se a tipologia for outra)
-    ind_estrutura: Optional[str] = None
-    ind_vedacao: Optional[str] = None
-    ind_carga_piso: Optional[float] = None
-    ind_pavimento_externo: Optional[str] = None
-
-    # Campos multifamiliar
-    multi_sistema_principal: Optional[str] = None
-    multi_tipo_laje: Optional[str] = None
-
-    # Campos corporativo / data center
-    corp_fachada: Optional[str] = None
-    dc_tier_redundancia: Optional[str] = None
-
-    # Campos shopping
-    shop_estrutura: Optional[str] = None
-    shop_cobertura: Optional[str] = None
+# As tabelas agora ficam em nucleo/tabelas.py; reexportadas aqui para as telas Flet.
+from nucleo.tabelas import PadraoConstrutivo, TipologiaProjeto  # noqa: E402,F401
