@@ -299,7 +299,7 @@ def _secao_documentos(documentos, estilos, com_titulo: bool = True):
     return elementos
 
 
-def gerar_documentos_pdf(destino: Path, projeto, documentos, gerado_por: str, nome_app: str = "Memória de Projetos",
+def gerar_documentos_pdf(destino: Path, projeto, documentos, gerado_por: str, nome_app: str = "Decidiu",
                          agora: datetime = None, logo_empresa=None, logo_cliente=None) -> int:
     """PDF só com o checklist de documentos de referência. Devolve quantos itens entraram."""
     agora = agora or datetime.now()
@@ -365,7 +365,7 @@ def gerar_relatorio_pdf(
     filtros_texto: str = "Todas as decisões",
     incluir_ficha: bool = True,
     incluir_detalhes: bool = True,
-    nome_app: str = "Memória de Projetos",
+    nome_app: str = "Decidiu",
     agora: datetime = None,
     logo_empresa=None,
     logo_cliente=None,

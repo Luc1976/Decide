@@ -24,7 +24,7 @@ DB_PATH = DATA_DIR / "memoria_projetos.db"
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 UPLOAD_DIR = DATA_DIR / "uploads"
 
-NOME_APP = "Memória de Projetos"  # aparece no rodapé dos relatórios em PDF
+NOME_APP = "Decidiu"  # aparece no rodapé dos relatórios em PDF
 
 # Relatórios em PDF gerados sob demanda; ficam fora da pasta pública e são apagados depois de 24 h.
 RELATORIOS_DIR = DATA_DIR / "relatorios"
