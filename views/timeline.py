@@ -56,6 +56,7 @@ from logos import (
     salvar_logo_projeto,
 )
 from models import CATEGORIAS, IMPACTOS, NIVEL_PAPEL, PAPEIS
+from nucleo.servicos.decisoes import texto_do_item
 from marca import marca_cabecalho
 from seguranca import assinar_token, segredo_do_servidor
 from views.abrir_link import mostrar_link
@@ -1433,8 +1434,8 @@ def build_timeline_view(
                     for item in itens:
                         area_check.controls.append(
                             ft.Checkbox(
-                                label=item["tarefa"],
-                                value=item["feito"],
+                                label=texto_do_item(item),
+                                value=bool(isinstance(item, dict) and item.get("feito")),
                                 disabled=True,
                             )
                         )

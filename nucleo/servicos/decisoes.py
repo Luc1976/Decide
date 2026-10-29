@@ -31,12 +31,20 @@ class DadosDecisao:
     alternativa_descartada: Optional[str] = None
     data_decisao: Optional[datetime.date] = None
     anexos: List[str] = field(default_factory=list)       # chaves do armazenamento
-    checklist: Optional[list] = None                      # [{"texto": ..., "feito": bool}]
+    checklist: Optional[list] = None                      # [{"tarefa" ou "texto": ..., "feito": bool}]
     alteracao_ficha: Optional[Tuple[str, str, str, str]] = None  # (grupo, nome, unidade, valor)
 
 
 def anexos_da_decisao(decisao: Decisao) -> List[str]:
     return [c for c in (decisao.anexos or "").split(",") if c]
+
+
+def texto_do_item(item) -> str:
+    """Texto de um item do checklist. As telas gravam {"tarefa": ...} e a API grava
+    {"texto": ...}; quem lê aceita os dois."""
+    if not isinstance(item, dict):
+        return str(item or "")
+    return str(item.get("tarefa") or item.get("texto") or "")
 
 
 def checklist_da_decisao(decisao: Decisao) -> list:
