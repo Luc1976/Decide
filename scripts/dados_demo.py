@@ -295,9 +295,9 @@ ETAPAS = [
                       "(4 a 6 meses a mais) e pagamento estimado de R$ 1,9 milhão.",
      "alternativa": "Outorga onerosa para CA 4,8 (+2 pavimentos, +8 unidades): descartada pelo custo "
                     "e pelo risco ao prazo de lançamento.",
-     "checklist": [{"texto": "Consulta prévia de viabilidade protocolada", "feito": True},
-                   {"texto": "Certidão de uso do solo emitida", "feito": True},
-                   {"texto": "Quadro de áreas preliminar conferido", "feito": True}]},
+     "checklist": [{"tarefa": "Consulta prévia de viabilidade protocolada", "feito": True},
+                   {"tarefa": "Certidão de uso do solo emitida", "feito": True},
+                   {"tarefa": "Quadro de áreas preliminar conferido", "feito": True}]},
 
     {"tipo": "documento", "quando": _d(2025, 9, 5, 17), "autor": "demo.bianca",
      "nome": "Levantamento topográfico", "situacao": "Recebido", "data_recebimento": date(2025, 9, 5),
@@ -332,9 +332,9 @@ ETAPAS = [
                       "junto à divisa leste.",
      "alternativa": "Estacas pré-moldadas cravadas (vibração na vizinhança) e tubulões (inviáveis "
                     "abaixo do nível d'água).",
-     "checklist": [{"texto": "Relatório de sondagens R01 analisado", "feito": True},
-                   {"texto": "Estimativa de cargas por pilar", "feito": True},
-                   {"texto": "Consulta a 2 executoras sobre disponibilidade", "feito": False}],
+     "checklist": [{"tarefa": "Relatório de sondagens R01 analisado", "feito": True},
+                   {"tarefa": "Estimativa de cargas por pilar", "feito": True},
+                   {"tarefa": "Consulta a 2 executoras sobre disponibilidade", "feito": False}],
      "ficha": (O, "Fundações", "", "Estacas hélice contínua Ø50/Ø60 cm, L ≈ 16 m")},
     {"tipo": "resolver", "quando": _d(2025, 10, 16, 11, 30), "autor": "demo.tiago", "pendencia": "sondagens SPT",
      "decisao": "fundacoes", "observacao": "Sondagens recebidas em 10/10 e usadas na definição das fundações."},
@@ -373,8 +373,8 @@ ETAPAS = [
      "justificativa": "Atende à concessionária e antecipa uma demanda crescente dos compradores, "
                       "sem custo de equipamentos agora.",
      "alternativa": "Carregadores instalados na entrega: custo de R$ 380 mil, descartado pela Cambará.",
-     "checklist": [{"texto": "Consulta de viabilidade à concessionária", "feito": True},
-                   {"texto": "Cálculo de demanda com a reserva para recarga", "feito": True}]},
+     "checklist": [{"tarefa": "Consulta de viabilidade à concessionária", "feito": True},
+                   {"tarefa": "Cálculo de demanda com a reserva para recarga", "feito": True}]},
     {"tipo": "decisao", "quando": _d(2025, 12, 9, 10, 30), "autor": "demo.camila", "chave": "ar_condicionado",
      "titulo": "Infraestrutura para ar-condicionado split com condensadoras em nichos técnicos",
      "categoria": "HVAC", "impacto": "Médio",
@@ -405,9 +405,9 @@ ETAPAS = [
      "descricao": f"Projeto legal protocolado com área computável de 6.980 m², pelo escritório "
                   f"{LEGALIZACAO}.",
      "justificativa": "Prazo combinado com a Cambará para manter o lançamento no 1º semestre.",
-     "checklist": [{"texto": "RRT de projeto emitido", "feito": True},
-                   {"texto": "Memorial descritivo e quadro de áreas", "feito": True},
-                   {"texto": "Anuência prévia do Corpo de Bombeiros", "feito": False}],
+     "checklist": [{"tarefa": "RRT de projeto emitido", "feito": True},
+                   {"tarefa": "Memorial descritivo e quadro de áreas", "feito": True},
+                   {"tarefa": "Anuência prévia do Corpo de Bombeiros", "feito": False}],
      "ficha": (O, "Situação do projeto legal", "", "Protocolado em 10/02/2026")},
     {"tipo": "decisao", "quando": _d(2026, 2, 24, 11), "autor": "demo.rafael", "chave": "escada",
      "titulo": "Escada à prova de fumaça com antecâmara e elevador de emergência",
@@ -455,9 +455,9 @@ ETAPAS = [
      "descricao": "Projeto legal aprovado sem novas exigências; alvará emitido em 16/06/2026.",
      "justificativa": "Com o alvará, o executivo começa sobre a versão aprovada, congelada como "
                       "referência para as disciplinas.",
-     "checklist": [{"texto": "Alvará arquivado no projeto", "feito": True},
-                   {"texto": "Versão aprovada distribuída aos complementares", "feito": True},
-                   {"texto": "Cronograma do executivo atualizado", "feito": True}],
+     "checklist": [{"tarefa": "Alvará arquivado no projeto", "feito": True},
+                   {"tarefa": "Versão aprovada distribuída aos complementares", "feito": True},
+                   {"tarefa": "Cronograma do executivo atualizado", "feito": True}],
      "ficha": (O, "Situação do projeto legal", "", "Alvará emitido em 16/06/2026")},
 
     # ---------------- Executivo (jul–out/2026)
@@ -498,9 +498,9 @@ ETAPAS = [
      "justificativa": "Reforça o conceito de jardim do empreendimento e conversa com as quaresmeiras "
                       "do paisagismo frontal.",
      "alternativa": "Paleta neutra em cinza e branco: descartada por parecer igual aos concorrentes.",
-     "checklist": [{"texto": "Moodboard aprovado pela Cambará", "feito": True},
-                   {"texto": "Orçamento de mobiliário dentro da verba", "feito": True},
-                   {"texto": "Amostras de revestimento recebidas", "feito": False}]},
+     "checklist": [{"tarefa": "Moodboard aprovado pela Cambará", "feito": True},
+                   {"tarefa": "Orçamento de mobiliário dentro da verba", "feito": True},
+                   {"tarefa": "Amostras de revestimento recebidas", "feito": False}]},
     {"tipo": "pendencia", "quando": _d(2026, 10, 14, 16), "autor": "demo.camila",
      "titulo": "Definir fornecedor dos coletores solares",
      "descricao": "Comparar 3 propostas de coletores para o sistema de aquecimento central.",

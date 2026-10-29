@@ -198,7 +198,9 @@ def _lista_checklist(texto_json):
         itens = json.loads(texto_json) if texto_json else []
     except ValueError:
         return []
-    return [(str(i.get("tarefa", "")), bool(i.get("feito"))) for i in itens if isinstance(i, dict)]
+    from nucleo.servicos.decisoes import texto_do_item  # telas gravam "tarefa", a API grava "texto"
+
+    return [(texto_do_item(i), bool(i.get("feito"))) for i in itens if isinstance(i, dict)]
 
 
 def _bloco_decisao(decisao, estilos, atas_por_id, alteracoes, incluir_detalhes):
