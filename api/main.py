@@ -20,7 +20,8 @@ from config import garantir_pastas
 from models import CAMPOS_LONGOS, CATEGORIAS, FICHA_GRUPOS, IMPACTOS, PAPEIS
 from nucleo.db import aguardar_banco
 from nucleo.migracoes import atualizar_banco
-from nucleo.tabelas import SITUACOES_PENDENCIA, TipologiaProjeto
+import catalogo_tipologias as catalogo
+from nucleo.tabelas import SITUACOES_PENDENCIA
 
 
 @asynccontextmanager
@@ -78,9 +79,20 @@ def criar_app() -> FastAPI:
             "impactos": IMPACTOS,
             "papeis": PAPEIS,
             "situacoes_pendencia": SITUACOES_PENDENCIA,
-            "tipologias": [t.value for t in TipologiaProjeto],
+            "tipologias": list(catalogo.TIPOLOGIAS),
+            "opcao_outro": catalogo.OUTRO,
             "ficha_grupos": {g: [{"nome": n, "unidade": u or None, "longo": n in CAMPOS_LONGOS} for n, u in campos]
                              for g, campos in FICHA_GRUPOS.items()},
+            "ordem_dos_grupos": catalogo.ordem_dos_grupos(),
+            # Campos de cada tipologia. 'opcoes' vazio = campo de texto (número); toda lista
+            # aceita "Outro" com texto livre. 'depende_de' + 'valores_que_mostram' = cascata.
+            "campos_por_tipologia": {
+                t: [{"grupo": c.grupo, "nome": c.nome, "unidade": c.unidade or None,
+                     "opcoes": list(c.opcoes), "depende_de": c.depende_de,
+                     "valores_que_mostram": list(c.valores_que_mostram)}
+                    for c in catalogo.campos_da_tipologia(t)]
+                for t in catalogo.TIPOLOGIAS
+            },
         }
 
     return app

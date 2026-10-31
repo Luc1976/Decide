@@ -51,7 +51,7 @@ O que foi encontrado na leitura do código e como cada ponto foi tratado:
 | 8 | `autor` gravado como texto (nome), anexos como texto separado por vírgula, checklist como JSON em texto | Nome muda e o histórico perde o vínculo; anexos sem metadados | Mantido para não quebrar o banco. A API já expõe anexos e checklist estruturados. Migração na seção 9 |
 | 9 | Migrações feitas à mão (`ALTER TABLE` com `PRAGMA`) | Só funciona no SQLite; frágil | **Resolvido**: Alembic (seção 6). O que era feito à mão virou parte da migração base |
 | 10 | Título de decisão podia ficar vazio | Registro sem título na linha do tempo | **Resolvido**: o serviço valida título, categoria e impacto, e a tela mostra a mensagem |
-| 11 | `ficha.py` e `questionario_sistemas.py` na raiz são cópias idênticas dos arquivos em `views/` | Confusão ao editar | Não alterado. Pode apagar as cópias da raiz |
+| 11 | `ficha.py` e `questionario_sistemas.py` na raiz eram cópias dos arquivos em `views/` | Confusão ao editar | **Resolvido**: apagadas junto com a tela antiga de sistemas construtivos (ficha por tipologia) |
 
 ## 3. Camada de serviços (`nucleo/`)
 
@@ -73,7 +73,7 @@ O que foi encontrado na leitura do código e como cada ponto foi tratado:
 | `servicos/decisoes.py` | Registrar, listar/filtrar, anexos. Decisão não é editada nem apagada |
 | `servicos/atas.py` | Rascunho → fechamento (`[D]`, `[F]`, `[P]` numa transação), adendos, pré-visualização |
 | `servicos/pendencias.py` | Criar, editar, resolver (com decisão existente ou nova), cancelar, reabrir |
-| `servicos/ficha.py` | Ficha, indicadores, histórico com origem, padrão construtivo |
+| `servicos/ficha.py` | Ficha, indicadores, histórico com origem; campos da tipologia (`catalogo_tipologias.py`) com limpeza na troca |
 | `servicos/relatorios.py` | PDF do relatório e da ata (reaproveita `relatorio_pdf.py` e `ata_pdf.py`) |
 | `servicos/ia.py` | Rascunho de ata pela IA (reaproveita `ia_transcricao.py`) |
 | `servicos/anexos.py` | Envio para a pasta do projeto e links assinados de download |
@@ -100,7 +100,6 @@ gravação é uma transação completa (valida, grava, audita, faz commit). Fun�
 | `adicionar_adendo` | `atas.adicionar_adendo` | `POST …/atas/{id}/adendos` |
 | `criar/atualizar/resolver/cancelar/reabrir_pendencia` | `pendencias.*` | `…/pendencias` e ações |
 | `salvar_caracteristicas`, `listar_historico_ficha` | `ficha.salvar/historico` | `PUT …/ficha`, `GET …/ficha/historico` |
-| `salvar/obter_padrao_construtivo` | `ficha.salvar_padrao/obter_padrao` | `PUT/GET …/padrao-construtivo` |
 | lógica em `views/timeline.py` e `views/atas.py` | `relatorios.*`, `ia.*`, `anexos.*` | PDFs, `…/atas/rascunho-ia`, `…/anexos` |
 
 ## 4. Organizações e permissões
@@ -199,9 +198,8 @@ devolvem o arquivo.
 | GET / POST | `/projetos/{projeto_id}/pendencias` | Listar (`status`, `q`) / criar |
 | GET / PUT | `/projetos/{projeto_id}/pendencias/{pendencia_id}` | Obter / editar (só em aberto) |
 | POST | `…/pendencias/{pendencia_id}/resolver` · `/cancelar` · `/reabrir` | Mudar a situação |
-| GET / PUT | `/projetos/{projeto_id}/ficha` | Ficha com indicadores / gravar campos |
+| GET / PUT | `/projetos/{projeto_id}/ficha` | Ficha com indicadores / gravar campos, inclusive os sistemas construtivos e alturas da tipologia |
 | GET | `/projetos/{projeto_id}/ficha/historico` | Histórico com origem ("Decisão D-005 · Ata 04") |
-| GET / PUT | `/projetos/{projeto_id}/padrao-construtivo` | Padrão construtivo por tipologia |
 | GET | `/projetos/{projeto_id}/relatorios/decisoes.pdf` | Relatório de decisões (qualquer membro) |
 | GET | `/organizacao` | A minha organização |
 | PUT | `/organizacao` | Renomear (admin) |
@@ -211,7 +209,7 @@ devolvem o arquivo.
 | GET / POST | `/plataforma/organizacoes` | Listar com contagens / criar com o primeiro admin (superadmin) |
 | PUT | `/plataforma/organizacoes/{id}/situacao` | Ativar ou suspender (superadmin) |
 | GET | `/arquivos/{token}` | Download por link assinado (sem login) |
-| GET | `/opcoes` | Listas fixas para os formulários (categorias, impactos, tipologias, campos da ficha) |
+| GET | `/opcoes` | Listas fixas para os formulários (categorias, impactos, tipologias, campos da ficha, `campos_por_tipologia` e `ordem_dos_grupos`) |
 | GET | `/api/saude` | Verificação de funcionamento (fora do `/v1`) |
 
 ## 6. Migrações do banco (Alembic)
@@ -226,6 +224,7 @@ O esquema do banco agora é controlado pelo Alembic. Cada mudança no modelo vir
 | `0003` tema do usuário | Coluna opcional `usuario.tema` ("claro"/"escuro"); vazia = escuro. `PUT /auth/tema` |
 | `0004` documentos de referência | Tabela `documentoreferencia` (checklist por projeto) e lista padrão nos projetos existentes. Rotas em `/projetos/{id}/documentos` |
 | `0005` arquivos dos documentos | Tabela `documentoarquivo` (um arquivo por linha, com `data_recebimento` e quem enviou); converte a coluna de texto `anexos` e a remove. Rotas `/documentos/{id}/arquivos` e `/documentos/relatorio.pdf` |
+| `0011` padrão construtivo na ficha | Só dados: copia `padraoconstrutivo` para campos da ficha ("Sistemas construtivos" e "Uso / tipologia"), com histórico de autor "Migração 0011"; "Multifamiliar" vira "Residencial". A tabela antiga fica, sem uso. O downgrade restaura os valores anteriores |
 
 **Na partida**, o app Flet (`init_db`) e a API rodam `upgrade head`, que só aplica o que falta.
 No PostgreSQL há uma trava (`pg_advisory_xact_lock`), então os dois podem iniciar juntos.

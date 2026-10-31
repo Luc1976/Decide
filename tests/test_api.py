@@ -182,14 +182,27 @@ def test_pdfs(cliente, equipe):
     assert cliente.get(f"{V}/projetos/{pid}/atas/{ata['id']}/pdf", headers=bia).content.startswith(b"%PDF")
 
 
-def test_padrao_construtivo_e_auditoria(cliente, equipe):
+def test_sistemas_da_tipologia_pela_ficha_e_auditoria(cliente, equipe):
     pid = equipe["pid"]
-    r = cliente.put(f"{V}/projetos/{pid}/padrao-construtivo",
-                    json={"tipologia": "Industrial", "ind_carga_piso": 5}, headers=equipe["bia"])
-    assert r.status_code == 200 and r.json()["ind_carga_piso"] == 5
-    assert cliente.get(f"{V}/projetos/{pid}/ficha", headers=equipe["cli"]).json()["padrao"]["tipologia"] == "Industrial"
+    itens = [{"grupo": "Programa", "nome": "Uso / tipologia", "valor": "Industrial"},
+             {"grupo": "Sistemas construtivos", "nome": "Carga de piso", "unidade": "tf/m²", "valor": "5"}]
+    r = cliente.put(f"{V}/projetos/{pid}/ficha", json={"itens": itens}, headers=equipe["bia"])
+    assert r.status_code == 200 and r.json()["campos_alterados"] == 2
+    campos = {c["nome"]: c for c in cliente.get(f"{V}/projetos/{pid}/ficha", headers=equipe["cli"]).json()["campos"]}
+    assert campos["Carga de piso"]["valor"] == "5" and "Altura dos portões" in campos and "padrao" not in campos
+    errado = [{"grupo": "Alturas e dimensões", "nome": "Pé-direito – cozinhas", "unidade": "m", "valor": "2,6"}]
+    assert cliente.put(f"{V}/projetos/{pid}/ficha", json={"itens": errado}, headers=equipe["bia"]).status_code in (400, 422)
+    assert cliente.put(f"{V}/projetos/{pid}/padrao-construtivo", json={}, headers=equipe["bia"]).status_code in (404, 405)
     acoes = [a["acao"] for a in cliente.get(f"{V}/projetos/{pid}/auditoria", headers=equipe["ana"]).json()]
-    assert acoes[0] == "padrao.salvar" and "projeto.criar" in acoes
+    assert acoes[0] == "ficha.salvar" and "projeto.criar" in acoes
+
+
+def test_opcoes_trazem_o_catalogo_de_tipologias(cliente):
+    opcoes = cliente.get(f"{V}/opcoes").json()
+    assert opcoes["tipologias"][0] == "Residencial" and "Condomínio de lotes" in opcoes["tipologias"]
+    laje = next(c for c in opcoes["campos_por_tipologia"]["Residencial"] if c["nome"] == "Tipo de laje")
+    assert laje["depende_de"] == "Sistema estrutural" and "Nervurada" in laje["opcoes"]
+    assert opcoes["ordem_dos_grupos"].index("Sistemas construtivos") == opcoes["ordem_dos_grupos"].index("Programa") + 1
 
 
 def test_excluir_projeto(cliente, equipe):

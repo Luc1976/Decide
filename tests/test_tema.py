@@ -118,14 +118,17 @@ def test_tela_principal_tem_so_busca_e_acoes_principais(cenario):
     view = _timeline(_pagina(tema.ESCURO), lucas, projeto)
     acoes, separador, lista = view.controls
     destaque = {b.content: b for b in _todos(acoes) if isinstance(b, ft.FilledButton)}
-    assert set(destaque) == {"+ Nova Decisão", "Atas de Reunião"}
+    # botão amarelo de pendências entrou em 27/10 (bcf03e5), com a contagem das abertas
+    assert set(destaque) == {"+ Nova Decisão", "Atas de Reunião", "Pendências (2)"}
     assert destaque["Atas de Reunião"].style.bgcolor == ft.Colors.TERTIARY  # cor diferente
+    assert destaque["Pendências (2)"].style.bgcolor == "#F9A825"  # âmbar, texto escuro
     assert destaque["+ Nova Decisão"].style.bgcolor is None  # azul principal do tema
     assert any(isinstance(x, ft.TextField) and x.label == "Buscar decisões" for x in _todos(acoes))
     assert isinstance(separador, ft.Divider) and isinstance(lista, ft.ListView) and lista.expand
     # nada além disso na área principal: o resto foi para o menu
     assert not [b for b in _todos(acoes) if isinstance(b, (ft.FilledTonalButton, ft.TextButton, ft.ListTile))]
-    assert view.appbar.title.controls[0].value == projeto.nome
+    # título da barra: logo do Decidiu + nome do projeto (logo entrou em 27/10)
+    assert projeto.nome in _textos(view.appbar.title)
 
 
 def test_menu_lateral_tem_as_demais_opcoes(cenario):
@@ -161,7 +164,7 @@ def test_permissoes_nao_mudaram(cenario):
     db.definir_membro(projeto.id, "cli", "Leitor", lucas.id)
     view = _timeline(_pagina(tema.CLARO), _usuario("cli"), projeto)
     botoes = {b.content: b.visible for b in _todos(view.controls[0]) if isinstance(b, ft.FilledButton)}
-    assert botoes == {"+ Nova Decisão": False, "Atas de Reunião": True}
+    assert botoes == {"+ Nova Decisão": False, "Atas de Reunião": True, "Pendências (2)": True}
     menu = _menu_visivel(view)
     assert {"Ficha do Empreendimento", "Relatório PDF", "Sair"} <= menu
     assert any(m.startswith("Pendências") for m in menu)
@@ -178,4 +181,4 @@ def test_celular_margens_menores_e_rotulos_curtos(cenario):
     pagina.width = 390
     view = _timeline(pagina, lucas, projeto)
     assert view.padding.left == 8
-    assert {b.content for b in _todos(view.controls[0]) if isinstance(b, ft.FilledButton)} == {"+ Decisão", "Atas"}
+    assert {b.content for b in _todos(view.controls[0]) if isinstance(b, ft.FilledButton)} == {"+ Decisão", "Atas", "Pend. (2)"}

@@ -12,10 +12,15 @@ from database import (
     mapa_origens_ficha,
     salvar_caracteristicas,
 )
+import catalogo_tipologias as catalogo
 from ficha_calculos import calcular_indicadores
-from models import CAMPOS_LONGOS, FICHA_GRUPOS, GRUPO_OUTRAS, NIVEL_PAPEL
+from models import CAMPO_TIPOLOGIA, CAMPOS_LONGOS, FICHA_GRUPOS, GRUPO_OUTRAS, GRUPO_PROGRAMA, NIVEL_PAPEL
 from layout import rotulo, col, largura_dialogo, opcoes_dialogo
-from views.questionario_sistemas import criar_aba_sistemas_construtivos
+
+CHAVE_TIPOLOGIA = (GRUPO_PROGRAMA, CAMPO_TIPOLOGIA)
+AVISO_SEM_TIPOLOGIA = "Escolha a tipologia no card Programa para ver os sistemas construtivos."
+AVISO_TIPOLOGIA_FORA = ("Esta tipologia não tem sistemas construtivos no catálogo. "
+                        "Use Outras características.")
 
 
 
@@ -25,8 +30,58 @@ def _hora_local(momento: datetime.datetime) -> datetime.datetime:
     return momento.astimezone()
 
 
+class _CampoLista:
+    """Lista de opções + "Outro" com campo de texto ao lado. Usado na tipologia e nos
+    campos do catálogo que têm opções."""
+
+    def __init__(self, nome, opcoes, valor, pode_editar, ao_mudar, largura):
+        escolha, texto = catalogo.escolha_e_texto(catalogo.CampoCatalogo(nome, tuple(opcoes)), valor)
+        self.opcoes = tuple(opcoes)
+        self.lista = ft.Dropdown(
+            label=nome,
+            options=[ft.DropdownOption(key=o, text=o) for o in (*opcoes, catalogo.OUTRO)],
+            value=escolha,
+            disabled=not pode_editar,
+            expand=True,
+        )
+        self.outro = ft.TextField(
+            label=f"{nome} – especifique",
+            value=texto,
+            visible=escolha == catalogo.OUTRO,
+            read_only=not pode_editar,
+            expand=True,
+        )
+
+        def ao_escolher(_):
+            self.outro.visible = self.lista.value == catalogo.OUTRO
+            ao_mudar()
+
+        self.lista.on_select = ao_escolher
+        self.controle = ft.Container(
+            col=largura,
+            content=ft.Column(spacing=6, controls=[self.lista, self.outro]),
+        )
+
+    @property
+    def valor(self) -> str:
+        campo = catalogo.CampoCatalogo(self.lista.label, self.opcoes)
+        return catalogo.valor_gravado(campo, self.lista.value, self.outro.value)
+
+
+class _CampoTexto:
+    def __init__(self, tf: ft.TextField):
+        self.tf = tf
+        self.controle = tf
+
+    @property
+    def valor(self) -> str:
+        return self.tf.value or ""
+
+
 def build_ficha_view(page, projeto, usuario, on_logout, on_voltar, on_open_documentos=None):
-    """Ficha de características do empreendimento: os inputs iniciais do projeto."""
+    """Ficha de características do empreendimento: os inputs iniciais do projeto, numa
+    tela só. A tipologia (card Programa) define os campos do catálogo que aparecem:
+    sistemas construtivos, alturas e características (catalogo_tipologias.py)."""
 
     # Leitor (cliente) vê a ficha, mas não altera.
     pode_editar = projeto is not None and (
@@ -45,14 +100,23 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar, on_open_docum
     if projeto is not None:
         salvos = {(c.grupo, c.nome): c for c in listar_caracteristicas(projeto.id)}
 
-    campos = {}  # (grupo, nome) -> (TextField, unidade)
-    linhas_por_grupo = {}  # grupo -> ft.Row que recebe os campos
+    campos = {}  # (grupo, nome) -> (_CampoTexto | _CampoLista, unidade)  — campos fixos e personalizados
+    do_catalogo = {}  # (grupo, nome) -> (_CampoTexto | _CampoLista, CampoCatalogo)
+    linhas_por_grupo = {}  # grupo -> ft.ResponsiveRow dos campos fixos/personalizados
+    linhas_catalogo = {}  # grupo -> ft.ResponsiveRow dos campos do catálogo visíveis
+    cards_catalogo = {}  # grupo do catálogo -> ft.Card (escondido quando vazio)
+    aviso_sistemas = ft.Text("", size=13, color=ft.Colors.ON_SURFACE_VARIANT)
     mensagem = ft.Text("", size=12)
     caixa_indicadores = ft.Column(spacing=6)
 
+    def valores_da_tela() -> dict:
+        valores = {chave: c.valor for chave, (c, _) in campos.items()}
+        valores.update({chave: c.valor for chave, (c, _) in do_catalogo.items()})
+        return valores
+
     # ---------- Indicadores calculados ----------
     def montar_indicadores():
-        valores = {nome: tf.value for (_, nome), (tf, _) in campos.items()}
+        valores = {nome: v for (_, nome), v in valores_da_tela().items()}
         linhas = calcular_indicadores(valores)
         if not linhas:
             caixa_indicadores.controls = [
@@ -90,8 +154,61 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar, on_open_docum
         montar_indicadores()
         page.update()
 
-    # ---------- Campos ----------
+    # ---------- Campos do catálogo (dependem da tipologia e da cascata) ----------
+    def criar_campo_catalogo(campo):
+        salvo = salvos.get(campo.chave)
+        valor = salvo.valor if salvo else ""
+        if campo.opcoes:
+            return _CampoLista(campo.nome, campo.opcoes, valor, pode_editar, ao_mudar_catalogo,
+                               col(12, sm=6, md=4))
+        rotulo_campo = f"{campo.nome} ({campo.unidade})" if campo.unidade else campo.nome
+        return _CampoTexto(ft.TextField(
+            label=rotulo_campo,
+            value=valor,
+            col=col(12, sm=6, md=4),
+            keyboard_type=ft.KeyboardType.NUMBER,
+            on_change=ao_digitar,
+            read_only=not pode_editar,
+        ))
+
+    def montar_catalogo():
+        """Refaz os campos do catálogo visíveis com os valores atuais da tela. Os controles
+        são reaproveitados: o que foi digitado num campo escondido volta se ele reaparecer."""
+        visiveis = catalogo.campos_visiveis(valores_da_tela())
+        # um campo novo pode abrir outro (cascata): repete até estabilizar
+        while True:
+            for campo in visiveis:
+                if campo.chave not in do_catalogo:
+                    do_catalogo[campo.chave] = (criar_campo_catalogo(campo), campo)
+            novos = catalogo.campos_visiveis(valores_da_tela())
+            if [c.chave for c in novos] == [c.chave for c in visiveis]:
+                break
+            visiveis = novos
+        for linha in linhas_catalogo.values():
+            linha.controls.clear()
+        for campo in visiveis:
+            linhas_catalogo[campo.grupo].controls.append(do_catalogo[campo.chave][0].controle)
+        for grupo, card in cards_catalogo.items():
+            card.visible = bool(linhas_catalogo[grupo].controls) or grupo == catalogo.GRUPO_SISTEMAS
+        tipologia = (campos[CHAVE_TIPOLOGIA][0].valor or "").strip()
+        sem_campos = not linhas_catalogo[catalogo.GRUPO_SISTEMAS].controls
+        aviso_sistemas.visible = sem_campos
+        aviso_sistemas.value = AVISO_TIPOLOGIA_FORA if tipologia else AVISO_SEM_TIPOLOGIA
+
+    def ao_mudar_catalogo():
+        mensagem.value = ""
+        montar_catalogo()
+        montar_indicadores()
+        page.update()
+
+    # ---------- Campos fixos e personalizados ----------
     def criar_campo(grupo, nome, unidade, valor):
+        if (grupo, nome) == CHAVE_TIPOLOGIA:
+            campo = _CampoLista(nome, catalogo.TIPOLOGIAS, valor, pode_editar, ao_mudar_catalogo,
+                                col(12, sm=6, md=4))
+            campos[(grupo, nome)] = (campo, unidade)
+            linhas_por_grupo[grupo].controls.append(campo.controle)
+            return campo
         longo = nome in CAMPOS_LONGOS
         opcoes = {}
         if longo:
@@ -104,9 +221,11 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar, on_open_docum
             read_only=not pode_editar,
             **opcoes,
         )
-        campos[(grupo, nome)] = (tf, unidade)
+        campos[(grupo, nome)] = (_CampoTexto(tf), unidade)
         linhas_por_grupo[grupo].controls.append(tf)
         return tf
+
+    todos_do_catalogo = catalogo.todos_os_campos()
 
     def montar_grupo(grupo, modelo):
         linhas_por_grupo[grupo] = ft.ResponsiveRow(spacing=10, run_spacing=10)
@@ -115,13 +234,16 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar, on_open_docum
             salvo = salvos.get((grupo, nome))
             criar_campo(grupo, nome, unidade, salvo.valor if salvo else "")
         # campos salvos que não estão (mais) no modelo continuam aparecendo
+        # (menos os do catálogo, que aparecem conforme a tipologia)
         for (g, nome), salvo in salvos.items():
-            if g == grupo and nome not in nomes_modelo:
+            if g == grupo and nome not in nomes_modelo and (g, nome) not in todos_do_catalogo:
                 criar_campo(grupo, nome, salvo.unidade or "", salvo.valor)
 
     for grupo, modelo in FICHA_GRUPOS.items():
         montar_grupo(grupo, modelo)
     montar_grupo(GRUPO_OUTRAS, [])
+    for grupo in catalogo.ordem_dos_grupos():
+        linhas_catalogo[grupo] = ft.ResponsiveRow(spacing=10, run_spacing=10)
 
     # ---------- Novo campo personalizado ----------
     input_novo_nome = ft.TextField(label="Nome da característica")
@@ -142,7 +264,7 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar, on_open_docum
             mensagem_novo.value = "Informe o nome da característica."
             page.update()
             return
-        if (GRUPO_OUTRAS, nome) in campos:
+        if (GRUPO_OUTRAS, nome) in campos or any(n == nome for _, n in catalogo.todos_os_campos()):
             mensagem_novo.value = "Já existe uma característica com esse nome."
             page.update()
             return
@@ -182,8 +304,15 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar, on_open_docum
         if projeto is None:
             return
         itens = [
-            (grupo, nome, unidade, tf.value or "")
-            for (grupo, nome), (tf, unidade) in campos.items()
+            (grupo, nome, unidade, campo.valor)
+            for (grupo, nome), (campo, unidade) in campos.items()
+        ]
+        # só os campos do catálogo visíveis; os escondidos são limpos pelo serviço (com histórico)
+        visiveis = {c.chave for c in catalogo.campos_visiveis(valores_da_tela())}
+        itens += [
+            (c.grupo, c.nome, c.unidade, controle.valor)
+            for chave, (controle, c) in do_catalogo.items()
+            if chave in visiveis
         ]
         try:
             qtd = salvar_caracteristicas(
@@ -239,14 +368,13 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar, on_open_docum
         page.show_dialog(modal_historico)
 
     # ---------- Montagem da tela ----------
-    montar_indicadores()
-
     def card_grupo(grupo, extra=None):
-        controles = [
-            ft.Text(grupo, size=16, weight=ft.FontWeight.BOLD),
-            ft.Divider(height=1),
-            linhas_por_grupo[grupo],
-        ]
+        controles = [ft.Text(grupo, size=16, weight=ft.FontWeight.BOLD), ft.Divider(height=1)]
+        if grupo in linhas_por_grupo:
+            controles.append(linhas_por_grupo[grupo])
+        if grupo == catalogo.GRUPO_SISTEMAS:
+            controles.append(aviso_sistemas)
+        controles.append(linhas_catalogo[grupo])
         if extra is not None:
             controles.append(extra)
         return ft.Card(
@@ -271,19 +399,21 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar, on_open_docum
             )
         )
     ]
-    for grupo in FICHA_GRUPOS:
-        cards.append(card_grupo(grupo))
-    cards.append(
-        card_grupo(
-            GRUPO_OUTRAS,
-            ft.Button(
+    for grupo in catalogo.ordem_dos_grupos():
+        extra = None
+        if grupo == GRUPO_OUTRAS:
+            extra = ft.Button(
                 content="+ Adicionar característica",
                 icon=ft.Icons.ADD,
                 on_click=abrir_novo_campo,
                 visible=pode_editar,
-            ),
-        )
-    )
+            )
+        card = card_grupo(grupo, extra)
+        if grupo in catalogo.GRUPOS_DO_CATALOGO:
+            cards_catalogo[grupo] = card
+        cards.append(card)
+    montar_catalogo()
+    montar_indicadores()
 
     header = ft.Container(
         padding=ft.Padding.symmetric(horizontal=18, vertical=14),
@@ -346,7 +476,7 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar, on_open_docum
         ),
     )
 
-    aba_dados = ft.Column(
+    corpo = ft.Column(
         [
             mensagem,
             ft.ListView(
@@ -358,32 +488,8 @@ def build_ficha_view(page, projeto, usuario, on_logout, on_voltar, on_open_docum
         ],
         expand=True,
     )
-    aba_sistemas = criar_aba_sistemas_construtivos(page, projeto, usuario, pode_editar)
-
-    # Flet 1.0: as abas são um conjunto Tabs > (TabBar + TabBarView); "length" = nº de abas.
-    abas = ft.Tabs(
-        length=2,
-        selected_index=0,
-        animation_duration=300,
-        expand=True,
-        content=ft.Column(
-            expand=True,
-            controls=[
-                ft.TabBar(
-                    tabs=[
-                        ft.Tab(label="Dados gerais"),
-                        ft.Tab(label="Sistemas construtivos"),
-                    ]
-                ),
-                ft.TabBarView(
-                    expand=True,
-                    controls=[aba_dados, aba_sistemas],
-                ),
-            ],
-        ),
-    )
 
     return ft.View(
         route="/ficha",
-        controls=[header, abas],
+        controls=[header, corpo],
     )

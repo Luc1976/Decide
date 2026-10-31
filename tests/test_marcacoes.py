@@ -25,3 +25,13 @@ def test_erros_das_decisoes_ignora_pendencias_e_linhas_validas():
     texto = "[D] (Urbanismo) (Baixo) Ok\n[D] Sem tag\n[P] (Qualquer) não conta"
     erros = erros_das_decisoes(texto)
     assert len(erros) == 1 and "Sem tag" in erros[0]
+
+
+def test_titulo_da_decisao_e_o_trecho_antes_dos_dois_pontos():
+    from nucleo.marcacoes import titulo_da_decisao
+
+    assert titulo_da_decisao("Trocar quadro geral: 3 fases") == "Trocar quadro geral"
+    assert titulo_da_decisao("Sem descrição separada") == "Sem descrição separada"
+    assert titulo_da_decisao(": só descrição") == ": só descrição"
+    assert titulo_da_decisao("Fachada: porcelanato: 60 × 120") == "Fachada"
+    assert len(titulo_da_decisao("x" * 100 + ": d")) == 70

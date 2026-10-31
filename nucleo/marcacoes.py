@@ -75,6 +75,14 @@ def extrair_pendencias(texto: str) -> List[str]:
     return [m.group(1) for m in map(_PADRAO_PENDENCIA.match, (texto or "").splitlines()) if m]
 
 
+def titulo_da_decisao(texto: str, limite: int = 70) -> str:
+    """Título de uma linha [D] no formato 'Título: descrição': o trecho antes dos primeiros
+    dois-pontos. Sem dois-pontos (ou com o título vazio), a linha inteira, cortada no limite."""
+    antes, dois_pontos, _ = (texto or "").partition(":")
+    titulo = antes.strip() if dois_pontos and antes.strip() else (texto or "").strip()
+    return titulo_da_linha(titulo, limite)
+
+
 def titulo_da_linha(linha: str, limite: int = 70) -> str:
     if len(linha) <= limite:
         return linha

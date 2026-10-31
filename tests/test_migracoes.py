@@ -10,11 +10,13 @@ from sqlmodel import Session, SQLModel, select
 
 from nucleo.ator import Ator
 from nucleo.db import criar_engine
-from nucleo.migracoes import atualizar_banco, revisao_atual, voltar_banco
+from nucleo.migracoes import atualizar_banco, revisao_atual, revisao_mais_nova, voltar_banco
 from nucleo.servicos import projetos
 from nucleo.tabelas import Organizacao, Usuario
 
 DADOS = Path(__file__).parent / "dados"
+VERSOES = Path(__file__).parent.parent / "migracoes" / "versions"
+ULTIMA = revisao_mais_nova()  # o banco migrado tem de chegar à migração mais nova, seja ela qual for
 
 # Antes de qualquer migração: o banco de anos atrás (sem permissões, sem atas, sem numeração).
 ESQUEMA_MUITO_ANTIGO = """
@@ -63,10 +65,10 @@ def _povoar_producao(eng) -> None:
 def test_banco_novo_bate_com_o_modelo(tmp_path):
     eng = _banco(tmp_path)
     atualizar_banco(eng)
-    assert revisao_atual(eng) == "0005"
+    assert revisao_atual(eng) == ULTIMA
     assert _diferencas(eng) == []
     atualizar_banco(eng)  # de novo: não faz nada nem quebra
-    assert revisao_atual(eng) == "0005"
+    assert revisao_atual(eng) == ULTIMA
 
 
 def test_banco_novo_nao_cria_organizacao_vazia(tmp_path):
@@ -86,7 +88,7 @@ def test_banco_de_producao_migra_sem_perder_nada(tmp_path, monkeypatch):
 
     atualizar_banco(eng)
 
-    assert revisao_atual(eng) == "0005"
+    assert revisao_atual(eng) == ULTIMA
     assert _diferencas(eng) == []
     with Session(eng) as s:
         orgs = s.exec(select(Organizacao)).all()
@@ -114,7 +116,7 @@ def test_volta_e_reaplica_a_0002(tmp_path):
     with eng.connect() as c:
         assert c.execute(text("SELECT count(*) FROM usuario")).scalar() == 4  # dados ficaram
     atualizar_banco(eng)
-    assert revisao_atual(eng) == "0005" and _diferencas(eng) == []
+    assert revisao_atual(eng) == ULTIMA and _diferencas(eng) == []
 
 
 # ---------------------------------------------------------------- banco muito antigo
@@ -146,7 +148,7 @@ def test_app_completo_sobre_banco_migrado(tmp_path, monkeypatch):
         assert c.execute(text("SELECT count(*) FROM projeto")).scalar() == 2  # nem projeto exemplo
 
 
-@pytest.mark.parametrize("arquivo", ["0001_esquema_base.py", "0002_organizacoes.py", "0003_tema_do_usuario.py", "0004_documentos_referencia.py", "0005_arquivos_dos_documentos.py"])
+@pytest.mark.parametrize("arquivo", sorted(p.name for p in VERSOES.glob("0*.py")))
 def test_migracoes_tem_docstring_e_downgrade(arquivo):
     texto = (Path(__file__).parent.parent / "migracoes" / "versions" / arquivo).read_text()
     assert texto.startswith('"""') and "def downgrade" in texto
@@ -175,7 +177,7 @@ def test_anexos_antigos_dos_documentos_viram_arquivos_com_data(tmp_path):
                        "situacao = 'Recebido', data_recebimento = '2026-09-02', atualizado_por = 'Ana' "
                        "WHERE projeto_id = 1 AND nome = 'Levantamento topográfico'"))
     atualizar_banco(eng)
-    assert revisao_atual(eng) == "0005" and _diferencas(eng) == []
+    assert revisao_atual(eng) == ULTIMA and _diferencas(eng) == []
     with eng.connect() as c:
         linhas = c.execute(text("SELECT nome, data_recebimento, enviado_por FROM documentoarquivo ORDER BY id")).all()
     assert [(n, str(d)[:10], e) for n, d, e in linhas] == [

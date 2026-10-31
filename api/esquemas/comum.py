@@ -3,13 +3,14 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from models import CATEGORIAS, IMPACTOS, PAPEIS
-from nucleo.tabelas import SITUACOES_PENDENCIA, TipologiaProjeto
+from catalogo_tipologias import TIPOLOGIAS
+from nucleo.tabelas import SITUACOES_PENDENCIA
 
 Categoria = Literal[CATEGORIAS]
 Impacto = Literal[IMPACTOS]
 Papel = Literal[PAPEIS]
 SituacaoPendencia = Literal[SITUACOES_PENDENCIA]
-Tipologia = Literal[tuple(t.value for t in TipologiaProjeto)]
+Tipologia = Literal[TIPOLOGIAS]
 
 
 class Saida(BaseModel):

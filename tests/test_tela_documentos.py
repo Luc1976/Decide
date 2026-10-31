@@ -162,7 +162,10 @@ def test_botao_pdf_gera_e_abre(cenario):
     pagina, view = _tela(lucas, projeto)
     botao = next(b for b in _todos(view) if isinstance(b, ft.FilledTonalButton) and b.content == "PDF")
     asyncio.run(botao.on_click(None))
-    assert pagina.links and pagina.links[0].startswith("/anexo/")
+    # o Flet atual não tem page.launch_url: o link do PDF vem numa janela (views/abrir_link.py)
+    links = [s.url for x in _todos(pagina.dialogo) if isinstance(x, ft.Text)
+             for s in (x.spans or []) if getattr(s, "url", None)]
+    assert links and links[0].startswith("/anexo/")
     assert "PDF gerado." in _textos(view)
 
 

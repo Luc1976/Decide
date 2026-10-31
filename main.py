@@ -26,6 +26,11 @@ except ErroConexaoBanco as erro:
     raise SystemExit(1)
 aplicar_reset_de_senha_do_ambiente()  # só age se MEMORIA_RESETAR_SENHA estiver definida
 
+if os.getenv("DECIDIU_CARREGAR_DEMO"):  # só no ambiente de demonstração/testes
+    from scripts.seed_demo import carregar_pelo_ambiente
+
+    carregar_pelo_ambiente()
+
 _inseguros = usuarios_com_senha_padrao()
 if _inseguros:
     print(

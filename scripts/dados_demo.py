@@ -15,6 +15,7 @@ como Orçamento.
 """
 from datetime import date, datetime
 
+from catalogo_tipologias import GRUPO_ALTURAS, GRUPO_SISTEMAS
 from models import GRUPO_OUTRAS
 
 # ------------------------------------------------------------------ identificação
@@ -79,6 +80,8 @@ CAMILA = f"Camila Rezende ({INSTALACOES})"
 MARCOS = f"Marcos Albuquerque ({PROJETO_CLIENTE})"
 
 O = GRUPO_OUTRAS  # "Outras características" (campos personalizados da ficha)
+SIS = GRUPO_SISTEMAS  # campos do catálogo da tipologia (catalogo_tipologias.py)
+ALT = GRUPO_ALTURAS
 
 # ------------------------------------------------------------------ ficha inicial
 # (grupo, nome, unidade, valor). Os campos em "Outras características" são personalizados
@@ -99,7 +102,7 @@ FICHA_INICIAL = [
     ("Parâmetros urbanísticos", "Gabarito / altura máxima", "m", "48,00"),
     ("Parâmetros urbanísticos", "Recuos (frontal / laterais / fundos)", "m",
      "5,00 / 2,50 (h/6 acima do 4º pav.) / 3,00"),
-    ("Programa", "Uso / tipologia", "", "Residencial multifamiliar vertical"),
+    ("Programa", "Uso / tipologia", "", "Residencial"),
     ("Programa", "Nº de unidades", "", "48"),
     ("Programa", "Nº de pavimentos", "", "Térreo + 12 tipo + 2 subsolos"),
     ("Programa", "Área construída total prevista", "m²", "8.400,00"),
@@ -111,25 +114,24 @@ FICHA_INICIAL = [
      "Unidades de 2 e 3 dormitórios para famílias jovens; lazer completo no térreo; "
      "VGV estimado de R$ 62 milhões; lançamento comercial no 1º semestre de 2026 e início "
      "de obra no 2º semestre de 2026."),
-    (O, "Sistema estrutural", "", "A definir"),
-    (O, "Fundações", "", "Aguardando sondagens"),
-    (O, "Fachada", "", "A definir"),
-    (O, "Esquadrias", "", "A definir"),
-    (O, "Aquecimento de água", "", "A definir"),
+    (SIS, "Tipo de empreendimento", "", "Edifício vertical"),
+    (SIS, "Vedações", "", "Bloco cerâmico"),
+    (ALT, "Piso a piso – pavimento tipo", "m", "2,80"),
+    (ALT, "Piso a piso – térreo", "m", "4,50"),
+    (ALT, "Piso a piso – subsolo / estacionamento", "m", "3,00"),
+    (ALT, "Piso a piso – cobertura", "m", "3,20"),
+    (ALT, "Piso a piso – casa de máquinas e barrilete", "m", "3,50"),
+    (ALT, "Pé-direito livre mínimo – pavimento tipo", "m", "2,60"),
+    (ALT, "Pé-direito – sanitários", "m", "2,30"),
+    (ALT, "Pé-direito – cozinhas", "m", "2,50"),
+    (ALT, "Espessura do contrapiso", "cm", "4"),
     (O, "Elevadores", "", "A definir"),
     (O, "Altura da edificação", "m", "40,10"),
     (O, "Situação do projeto legal", "", "Não protocolado"),
 ]
 
-# Padrão construtivo (template por tipologia). Opções do app para Multifamiliar:
-# sistema: Alvenaria estrutural | Concreto armado convencional | Paredes de concreto in loco
-# laje:    Maciça | Treliçada | Nervurada
-PADRAO_INICIAL = {"tipologia": "Multifamiliar",
-                  "multi_sistema_principal": "Concreto armado convencional",
-                  "multi_tipo_laje": "Maciça"}
-PADRAO_REVISADO = {"tipologia": "Multifamiliar",
-                   "multi_sistema_principal": "Concreto armado convencional",
-                   "multi_tipo_laje": "Nervurada"}
+# Sistemas construtivos: campos da ficha definidos pela tipologia (catalogo_tipologias.py).
+# Ficam vazios no início e são preenchidos pelas decisões (D-008, D-009...) e pelas atas.
 
 # ------------------------------------------------------------------ atas (texto)
 
@@ -171,11 +173,12 @@ ATA_03 = """Compatibilização estrutural do anteprojeto, com a Calço e a Veio.
 3. Comparadas lajes nervuradas com cubetas plásticas: sem vigas internas, pilares reduzidos de 28 para 22 por pavimento e consumo de concreto semelhante, com aumento da altura entre pisos.
 4. A Veio pediu que as prumadas hidráulicas fiquem fora das unidades.
 
-[D] (Estrutura) (Alto) Revisão da {D:estrutura_macica}: lajes nervuradas com cubetas plásticas (h = 30 cm) nos pavimentos tipo, no lugar das lajes maciças; elimina as vigas internas e reduz o número de pilares.
-[F] Sistema estrutural = Concreto armado convencional, lajes nervuradas h = 30 cm (cubetas plásticas)
-[D] (Arquitetura) (Médio) Piso a piso do pavimento tipo passa de 2,80 m para 2,95 m, mantendo pé-direito livre de 2,60 m nos ambientes.
+[D] (Estrutura) (Alto) Lajes nervuradas no lugar das maciças (revisão da {D:estrutura_macica}): cubetas plásticas, h = 30 cm, nos pavimentos tipo; elimina as vigas internas e reduz o número de pilares.
+[F] Tipo de laje = Nervurada
+[D] (Arquitetura) (Médio) Piso a piso do tipo de 2,80 para 2,95 m: mantém pé-direito livre de 2,60 m nos ambientes com a laje nervurada.
+[F] Piso a piso – pavimento tipo = 2,95
 [F] Altura da edificação = 41,90
-[D] (Hidrossanitário) (Médio) Prumadas hidráulicas em shafts visitáveis junto às circulações, fora das unidades: facilita a manutenção e a medição individual.
+[D] (Hidrossanitário) (Médio) Prumadas hidráulicas em shafts fora das unidades: shafts visitáveis junto às circulações, para facilitar a manutenção e a medição individual.
 
 [P] Laudo cautelar de vizinhança antes do início das fundações (edifício a leste, junto à divisa).
 
@@ -188,11 +191,11 @@ ATA_04 = """Fachada e esquadrias, com a Envoltória.
 3. A Envoltória recomendou fixação mecânica (inserts) para placas acima de 60 × 60 cm em altura.
 4. Varandas: a convenção já deve prever o envidraçamento, para não haver padrões diferentes na fachada.
 
-[D] (Arquitetura) (Alto) Fachada em porcelanato 60 × 120 ventilado (inserts metálicos) nas empenas e na fachada frontal; textura acrílica nas faces internas das varandas.
-[F] Fachada = Porcelanato 60 × 120 ventilado em todas as faces + textura acrílica nas varandas
-[D] (Arquitetura) (Médio) Esquadrias de alumínio linha 30 com pintura eletrostática grafite e vidro laminado 6 mm nas varandas.
-[F] Esquadrias = Alumínio linha 30, pintura grafite, vidro laminado 6 mm
-[D] (Arquitetura) (Médio) Envidraçamento das varandas previsto na convenção do condomínio, com padrão único definido pela incorporadora.
+[D] (Arquitetura) (Alto) Fachada em porcelanato ventilado: placas 60 × 120 com inserts metálicos nas empenas e na fachada frontal; textura acrílica nas faces internas das varandas.
+[F] Fachada = Porcelanato ventilado
+[D] (Arquitetura) (Médio) Esquadrias de alumínio linha 30: pintura eletrostática grafite e vidro laminado 6 mm nas varandas.
+[F] Esquadrias = Alumínio
+[D] (Arquitetura) (Médio) Envidraçamento das varandas na convenção: padrão único definido pela incorporadora, previsto na convenção do condomínio.
 
 [P] Amostra física do porcelanato e mock-up da fixação para aprovação da Cambará."""
 
@@ -206,8 +209,8 @@ ATA_05 = """Análise do comunique-se da prefeitura sobre o projeto legal protoco
 [D] (Urbanismo) (Alto) Atender ao comunique-se: recuar o subsolo 1 em 1,50 m na frente do lote e ampliar o jardim sobre solo natural na faixa frontal.
 [F] Vagas de garagem = 70
 [F] Área construída total prevista = 8.620,00
-[D] (Urbanismo) (Médio) Três vagas acessíveis e duas para idosos no subsolo 1, sem reduzir as vagas privativas; as vagas de visitantes vão para o térreo.
-[D] (Geral) (Médio) Prazo de projeto estendido em 1 mês por causa da reanálise da prefeitura.
+[D] (Urbanismo) (Médio) Vagas acessíveis e para idosos no subsolo 1: três acessíveis e duas para idosos, sem reduzir as vagas privativas; as de visitantes vão para o térreo.
+[D] (Geral) (Médio) Prazo de projeto estendido em 1 mês: reanálise da prefeitura após o comunique-se.
 [F] Prazo previsto = 15
 
 [P] Reapresentar o projeto legal com as correções até 15/04/2026."""
@@ -218,12 +221,12 @@ ATA_06 = """Revisão de custos (engenharia de valor), com a equipe de orçamento
 2. Os maiores desvios: fachada ventilada em todas as faces (+ R$ 1,4 milhão) e aquecimento a gás individual (shafts e chaminés em todas as unidades).
 3. A Veio apresentou o sistema central coletivo com apoio solar e medição individual de água quente.
 
-[D] (Orçamento) (Alto) Orçamento paramétrico do anteprojeto em R$ 41,2 milhões (CUB + 18% de itens fora do CUB), acima da meta de R$ 39 milhões.
+[D] (Orçamento) (Alto) Orçamento paramétrico de R$ 41,2 milhões: CUB + 18% de itens fora do CUB, acima da meta de R$ 39 milhões.
 [F] Orçamento estimado = 41.200.000,00
-[D] (Hidrossanitário) (Alto) Revisão da {D:aquecimento_individual}: aquecimento central coletivo a gás com apoio solar e medição individual de água quente.
-[F] Aquecimento de água = Central coletivo a gás com apoio solar, medição individual
-[D] (Arquitetura) (Médio) Revisão da {D:fachada_ventilada}: porcelanato ventilado só na fachada frontal; empenas laterais em textura acrílica com frisos.
-[F] Fachada = Porcelanato 60 × 120 ventilado na fachada frontal + textura acrílica com frisos nas empenas
+[D] (Hidrossanitário) (Alto) Aquecimento central coletivo a gás (revisão da {D:aquecimento_individual}): com apoio solar e medição individual de água quente.
+[F] Aquecimento de água = Gás central coletivo
+[D] (Arquitetura) (Médio) Porcelanato ventilado só na fachada frontal (revisão da {D:fachada_ventilada}): empenas laterais em textura acrílica com frisos.
+[F] Fachada = Mista
 [D] (Orçamento) (Alto) Nova meta de orçamento depois da engenharia de valor: R$ 39,6 milhões.
 [F] Orçamento estimado = 39.600.000,00
 
@@ -235,9 +238,9 @@ ATA_07 = """Revisão do pavimento de cobertura.
 2. Proposta: transformar o 12º pavimento e o ático em duas coberturas duplex com terraço e piscina privativa.
 3. A Calço avaliou o impacto: reforço local da laje do terraço, sem mudar a malha de pilares.
 
-[D] (Arquitetura) (Alto) Último pavimento convertido em 2 coberturas duplex com terraço e piscina privativa, no lugar de 4 apartamentos tipo.
+[D] (Arquitetura) (Alto) Duas coberturas duplex no último pavimento: terraço e piscina privativa, no lugar de 4 apartamentos tipo.
 [F] Nº de unidades = 46
-[D] (Estrutura) (Médio) Reforço da laje do terraço da cobertura para as piscinas privativas (sobrecarga de 15 kN/m² na área das piscinas).
+[D] (Estrutura) (Médio) Reforço da laje do terraço da cobertura: sobrecarga de 15 kN/m² na área das piscinas privativas.
 
 [P] Confirmar com o comercial quantas vagas cada cobertura terá."""
 
@@ -247,7 +250,7 @@ ATA_08_RASCUNHO = """Compatibilização final do executivo (rascunho — ainda n
 2. A Veio propõe passar os dutos pela laje nervurada, entre as nervuras.
 3. A Calço precisa confirmar as furações.
 
-[D] (HVAC) (Médio) Dutos de exaustão das churrasqueiras passam entre as nervuras, com furação confirmada pela Calço.
+[D] (HVAC) (Médio) Dutos de exaustão entre as nervuras: passagem dos dutos das churrasqueiras, com furação confirmada pela Calço.
 [P] Calço confirmar a furação das nervuras no térreo e no 1º tipo."""
 
 # ------------------------------------------------------------------ etapas (ordem cronológica)
@@ -263,7 +266,6 @@ ETAPAS = [
     {"tipo": "projeto", "quando": _d(2025, 8, 11, 9, 30), "autor": "demo.rafael"},
     {"tipo": "membros", "quando": _d(2025, 8, 11, 9, 40), "autor": "demo.rafael"},
     {"tipo": "ficha", "quando": _d(2025, 8, 12, 15, 10), "autor": "demo.rafael", "itens": FICHA_INICIAL},
-    {"tipo": "padrao", "quando": _d(2025, 8, 12, 15, 25), "autor": "demo.rafael", "dados": PADRAO_INICIAL},
     {"tipo": "documento", "quando": _d(2025, 8, 13, 11), "autor": "demo.bianca", "nome": "Layout",
      "situacao": "Recebido", "data_recebimento": date(2025, 8, 8),
      "observacao": "Programa de necessidades da Cambará (planilha rev. 02)"},
@@ -295,9 +297,9 @@ ETAPAS = [
                       "(4 a 6 meses a mais) e pagamento estimado de R$ 1,9 milhão.",
      "alternativa": "Outorga onerosa para CA 4,8 (+2 pavimentos, +8 unidades): descartada pelo custo "
                     "e pelo risco ao prazo de lançamento.",
-     "checklist": [{"texto": "Consulta prévia de viabilidade protocolada", "feito": True},
-                   {"texto": "Certidão de uso do solo emitida", "feito": True},
-                   {"texto": "Quadro de áreas preliminar conferido", "feito": True}]},
+     "checklist": [{"tarefa": "Consulta prévia de viabilidade protocolada", "feito": True},
+                   {"tarefa": "Certidão de uso do solo emitida", "feito": True},
+                   {"tarefa": "Quadro de áreas preliminar conferido", "feito": True}]},
 
     {"tipo": "documento", "quando": _d(2025, 9, 5, 17), "autor": "demo.bianca",
      "nome": "Levantamento topográfico", "situacao": "Recebido", "data_recebimento": date(2025, 9, 5),
@@ -332,10 +334,10 @@ ETAPAS = [
                       "junto à divisa leste.",
      "alternativa": "Estacas pré-moldadas cravadas (vibração na vizinhança) e tubulões (inviáveis "
                     "abaixo do nível d'água).",
-     "checklist": [{"texto": "Relatório de sondagens R01 analisado", "feito": True},
-                   {"texto": "Estimativa de cargas por pilar", "feito": True},
-                   {"texto": "Consulta a 2 executoras sobre disponibilidade", "feito": False}],
-     "ficha": (O, "Fundações", "", "Estacas hélice contínua Ø50/Ø60 cm, L ≈ 16 m")},
+     "checklist": [{"tarefa": "Relatório de sondagens R01 analisado", "feito": True},
+                   {"tarefa": "Estimativa de cargas por pilar", "feito": True},
+                   {"tarefa": "Consulta a 2 executoras sobre disponibilidade", "feito": False}],
+     "ficha": (SIS, "Fundações", "", "Estaca hélice contínua")},
     {"tipo": "resolver", "quando": _d(2025, 10, 16, 11, 30), "autor": "demo.tiago", "pendencia": "sondagens SPT",
      "decisao": "fundacoes", "observacao": "Sondagens recebidas em 10/10 e usadas na definição das fundações."},
 
@@ -347,7 +349,8 @@ ETAPAS = [
      "justificativa": "Solução conhecida pelas construtoras da região, com mão de obra disponível e "
                       "menor custo de fôrmas para a geometria do estudo preliminar.",
      "alternativa": "Alvenaria estrutural: descartada porque impede as opções de planta pedidas pelo comercial.",
-     "ficha": (O, "Sistema estrutural", "", "Concreto armado convencional, lajes maciças h = 12 cm")},
+     "ficha": [(SIS, "Sistema estrutural", "", "Concreto armado convencional"),
+               (SIS, "Tipo de laje", "", "Maciça")]},
 
     {"tipo": "cancelar", "quando": _d(2025, 10, 30, 9), "autor": "demo.rafael", "pendencia": "depósitos privativos",
      "motivo": "O comercial descartou os depósitos privativos; o espaço no subsolo 2 vira bicicletário."},
@@ -357,7 +360,6 @@ ETAPAS = [
      "autor": "demo.rafael", "titulo": "Compatibilização estrutural do anteprojeto",
      "participantes": _p(HELENA, RAFAEL, TIAGO, CAMILA), "texto": ATA_03,
      "chaves": ["estrutura_nervurada", "piso_a_piso", "shafts"],
-     "padrao": PADRAO_REVISADO,
      "pendencias": [{"pendencia": "Laudo cautelar", "categoria": "Fundações",
                      "responsavel": "Cambará (contratação)", "prazo": date(2026, 11, 13)}]},
     {"tipo": "adendo", "quando": _d(2025, 11, 20, 8, 45), "autor": "demo.rafael", "ata": 3,
@@ -373,8 +375,8 @@ ETAPAS = [
      "justificativa": "Atende à concessionária e antecipa uma demanda crescente dos compradores, "
                       "sem custo de equipamentos agora.",
      "alternativa": "Carregadores instalados na entrega: custo de R$ 380 mil, descartado pela Cambará.",
-     "checklist": [{"texto": "Consulta de viabilidade à concessionária", "feito": True},
-                   {"texto": "Cálculo de demanda com a reserva para recarga", "feito": True}]},
+     "checklist": [{"tarefa": "Consulta de viabilidade à concessionária", "feito": True},
+                   {"tarefa": "Cálculo de demanda com a reserva para recarga", "feito": True}]},
     {"tipo": "decisao", "quando": _d(2025, 12, 9, 10, 30), "autor": "demo.camila", "chave": "ar_condicionado",
      "titulo": "Infraestrutura para ar-condicionado split com condensadoras em nichos técnicos",
      "categoria": "HVAC", "impacto": "Médio",
@@ -389,7 +391,7 @@ ETAPAS = [
                   "individual de gás e chaminé coletiva por prumada.",
      "justificativa": "Padrão de mercado para o médio-alto e sem custo condominial de operação.",
      "alternativa": "Aquecimento elétrico de passagem: consumo alto e risco de sobrecarga na demanda.",
-     "ficha": (O, "Aquecimento de água", "", "Gás individual – aquecedor de passagem")},
+     "ficha": (SIS, "Aquecimento de água", "", "Gás individual")},
 
     {"tipo": "ata", "quando": _d(2026, 1, 27, 14), "fechamento": _d(2026, 1, 28, 11),
      "autor": "demo.bianca", "titulo": "Fachada e esquadrias",
@@ -405,9 +407,9 @@ ETAPAS = [
      "descricao": f"Projeto legal protocolado com área computável de 6.980 m², pelo escritório "
                   f"{LEGALIZACAO}.",
      "justificativa": "Prazo combinado com a Cambará para manter o lançamento no 1º semestre.",
-     "checklist": [{"texto": "RRT de projeto emitido", "feito": True},
-                   {"texto": "Memorial descritivo e quadro de áreas", "feito": True},
-                   {"texto": "Anuência prévia do Corpo de Bombeiros", "feito": False}],
+     "checklist": [{"tarefa": "RRT de projeto emitido", "feito": True},
+                   {"tarefa": "Memorial descritivo e quadro de áreas", "feito": True},
+                   {"tarefa": "Anuência prévia do Corpo de Bombeiros", "feito": False}],
      "ficha": (O, "Situação do projeto legal", "", "Protocolado em 10/02/2026")},
     {"tipo": "decisao", "quando": _d(2026, 2, 24, 11), "autor": "demo.rafael", "chave": "escada",
      "titulo": "Escada à prova de fumaça com antecâmara e elevador de emergência",
@@ -455,9 +457,9 @@ ETAPAS = [
      "descricao": "Projeto legal aprovado sem novas exigências; alvará emitido em 16/06/2026.",
      "justificativa": "Com o alvará, o executivo começa sobre a versão aprovada, congelada como "
                       "referência para as disciplinas.",
-     "checklist": [{"texto": "Alvará arquivado no projeto", "feito": True},
-                   {"texto": "Versão aprovada distribuída aos complementares", "feito": True},
-                   {"texto": "Cronograma do executivo atualizado", "feito": True}],
+     "checklist": [{"tarefa": "Alvará arquivado no projeto", "feito": True},
+                   {"tarefa": "Versão aprovada distribuída aos complementares", "feito": True},
+                   {"tarefa": "Cronograma do executivo atualizado", "feito": True}],
      "ficha": (O, "Situação do projeto legal", "", "Alvará emitido em 16/06/2026")},
 
     # ---------------- Executivo (jul–out/2026)
@@ -498,9 +500,9 @@ ETAPAS = [
      "justificativa": "Reforça o conceito de jardim do empreendimento e conversa com as quaresmeiras "
                       "do paisagismo frontal.",
      "alternativa": "Paleta neutra em cinza e branco: descartada por parecer igual aos concorrentes.",
-     "checklist": [{"texto": "Moodboard aprovado pela Cambará", "feito": True},
-                   {"texto": "Orçamento de mobiliário dentro da verba", "feito": True},
-                   {"texto": "Amostras de revestimento recebidas", "feito": False}]},
+     "checklist": [{"tarefa": "Moodboard aprovado pela Cambará", "feito": True},
+                   {"tarefa": "Orçamento de mobiliário dentro da verba", "feito": True},
+                   {"tarefa": "Amostras de revestimento recebidas", "feito": False}]},
     {"tipo": "pendencia", "quando": _d(2026, 10, 14, 16), "autor": "demo.camila",
      "titulo": "Definir fornecedor dos coletores solares",
      "descricao": "Comparar 3 propostas de coletores para o sistema de aquecimento central.",

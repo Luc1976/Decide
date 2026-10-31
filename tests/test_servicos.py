@@ -178,6 +178,13 @@ def test_cota_mensal_de_ia_por_plano(s, cenario):
 
     p, bia = cenario["p"], cenario["bia"]
     org = s.get(Organizacao, s.get(Projeto, p).organizacao_id)
+    # a organização de teste nasce no plano interno, que não tem limite de IA
+    assert org.plano == planos.PLANO_INTERNO and ia.situacao_uso(s, bia, p)["limite"] is None
+    ia.verificar_cota(s, bia, p)
+    # num plano pago, o limite do plano vale
+    org.plano, org.assinatura_status = planos.PLANO_EQUIPE, planos.STATUS_ATIVA
+    s.add(org)
+    s.commit()
     limite = planos.LIMITES_IA_MENSAL[org.plano]
     assert ia.situacao_uso(s, bia, p)["limite"] == limite
     for _ in range(limite):

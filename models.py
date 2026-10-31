@@ -27,6 +27,8 @@ CAMPO_TO = "Taxa de ocupação (TO)"
 CAMPO_CA = "Coeficiente de aproveitamento (CA)"
 CAMPO_TP = "Taxa de permeabilidade"
 CAMPO_AREA_CONSTRUIDA = "Área construída total prevista"
+GRUPO_PROGRAMA = "Programa"
+CAMPO_TIPOLOGIA = "Uso / tipologia"  # lista de opções: catalogo_tipologias.TIPOLOGIAS
 
 FICHA_GRUPOS = {
     "Terreno e localização": [
@@ -43,8 +45,8 @@ FICHA_GRUPOS = {
         ("Gabarito / altura máxima", "m"),
         ("Recuos (frontal / laterais / fundos)", "m"),
     ],
-    "Programa": [
-        ("Uso / tipologia", ""),
+    GRUPO_PROGRAMA: [
+        (CAMPO_TIPOLOGIA, ""),
         ("Nº de unidades", ""),
         ("Nº de pavimentos", ""),
         (CAMPO_AREA_CONSTRUIDA, "m²"),

@@ -28,7 +28,7 @@ from reportlab.platypus import (
 )
 
 from ficha_calculos import calcular_indicadores
-from models import FICHA_GRUPOS, GRUPO_OUTRAS
+from models import FICHA_GRUPOS
 
 AZUL = colors.HexColor("#1F3A5F")
 CINZA = colors.HexColor("#5F6B7A")
@@ -198,7 +198,9 @@ def _lista_checklist(texto_json):
         itens = json.loads(texto_json) if texto_json else []
     except ValueError:
         return []
-    return [(str(i.get("tarefa", "")), bool(i.get("feito"))) for i in itens if isinstance(i, dict)]
+    from nucleo.servicos.decisoes import texto_do_item  # telas gravam "tarefa", a API grava "texto"
+
+    return [(texto_do_item(i), bool(i.get("feito"))) for i in itens if isinstance(i, dict)]
 
 
 def _bloco_decisao(decisao, estilos, atas_por_id, alteracoes, incluir_detalhes):
@@ -334,9 +336,13 @@ def _secao_ficha(caracteristicas, estilos):
     if not por_chave:
         return []
     elementos = _titulo_secao("Ficha do empreendimento", estilos)
-    ordem = list(FICHA_GRUPOS) + [GRUPO_OUTRAS]
-    for grupo in ordem:
+    import catalogo_tipologias as catalogo
+
+    # Sistemas construtivos e alturas logo depois de Programa, na ordem do catálogo da tipologia.
+    do_catalogo = catalogo.campos_visiveis({chave: c.valor for chave, c in por_chave.items()})
+    for grupo in catalogo.ordem_dos_grupos():
         nomes_modelo = [n for n, _ in FICHA_GRUPOS.get(grupo, [])]
+        nomes_modelo += [c.nome for c in do_catalogo if c.grupo == grupo]
         extras = sorted(n for (g, n) in por_chave if g == grupo and n not in nomes_modelo)
         linhas = []
         for nome in nomes_modelo + extras:
