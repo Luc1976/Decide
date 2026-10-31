@@ -17,7 +17,7 @@ from nucleo.ator import Ator
 from nucleo.erros import Conflito, NaoEncontrado
 from nucleo.marcacoes import (
     FORMATO_DECISAO, erros_das_decisoes, extrair_decisoes, extrair_pendencias,
-    interpretar_decisao, normalizar, titulo_da_linha,
+    interpretar_decisao, normalizar, titulo_da_decisao, titulo_da_linha,
 )
 from nucleo.permissoes import EDITOR, LEITOR, exigir, pode_editar
 from nucleo.servicos import ficha as servico_ficha
@@ -196,7 +196,7 @@ def fechar(s: Session, ator: Ator, reuniao_id: int, projeto_id: Optional[int] = 
         marcas = interpretar_decisao(linha)
         dec = Decisao(
             projeto_id=pid,
-            titulo=titulo_da_linha(marcas["texto"]),
+            titulo=titulo_da_decisao(marcas["texto"]),
             categoria=marcas["categoria"],
             descricao=marcas["texto"],
             justificativa=f"Registrada na Ata {ata.numero:02d} - {ata.titulo}",

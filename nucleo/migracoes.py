@@ -42,6 +42,13 @@ def voltar_banco(revisao: str, engine: Optional[Engine] = None) -> None:
         command.downgrade(_config(conexao), revisao)
 
 
+def revisao_mais_nova() -> str:
+    """Última migração existente em migracoes/versions (o 'head' do Alembic)."""
+    from alembic.script import ScriptDirectory
+
+    return ScriptDirectory.from_config(_config()).get_current_head()
+
+
 def revisao_atual(engine: Optional[Engine] = None) -> Optional[str]:
     from alembic.migration import MigrationContext
 

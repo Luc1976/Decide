@@ -173,12 +173,12 @@ ATA_03 = """Compatibilização estrutural do anteprojeto, com a Calço e a Veio.
 3. Comparadas lajes nervuradas com cubetas plásticas: sem vigas internas, pilares reduzidos de 28 para 22 por pavimento e consumo de concreto semelhante, com aumento da altura entre pisos.
 4. A Veio pediu que as prumadas hidráulicas fiquem fora das unidades.
 
-[D] (Estrutura) (Alto) Revisão da {D:estrutura_macica}: lajes nervuradas com cubetas plásticas (h = 30 cm) nos pavimentos tipo, no lugar das lajes maciças; elimina as vigas internas e reduz o número de pilares.
+[D] (Estrutura) (Alto) Lajes nervuradas no lugar das maciças (revisão da {D:estrutura_macica}): cubetas plásticas, h = 30 cm, nos pavimentos tipo; elimina as vigas internas e reduz o número de pilares.
 [F] Tipo de laje = Nervurada
-[D] (Arquitetura) (Médio) Piso a piso do pavimento tipo passa de 2,80 m para 2,95 m, mantendo pé-direito livre de 2,60 m nos ambientes.
+[D] (Arquitetura) (Médio) Piso a piso do tipo de 2,80 para 2,95 m: mantém pé-direito livre de 2,60 m nos ambientes com a laje nervurada.
 [F] Piso a piso – pavimento tipo = 2,95
 [F] Altura da edificação = 41,90
-[D] (Hidrossanitário) (Médio) Prumadas hidráulicas em shafts visitáveis junto às circulações, fora das unidades: facilita a manutenção e a medição individual.
+[D] (Hidrossanitário) (Médio) Prumadas hidráulicas em shafts fora das unidades: shafts visitáveis junto às circulações, para facilitar a manutenção e a medição individual.
 
 [P] Laudo cautelar de vizinhança antes do início das fundações (edifício a leste, junto à divisa).
 
@@ -191,11 +191,11 @@ ATA_04 = """Fachada e esquadrias, com a Envoltória.
 3. A Envoltória recomendou fixação mecânica (inserts) para placas acima de 60 × 60 cm em altura.
 4. Varandas: a convenção já deve prever o envidraçamento, para não haver padrões diferentes na fachada.
 
-[D] (Arquitetura) (Alto) Fachada em porcelanato 60 × 120 ventilado (inserts metálicos) nas empenas e na fachada frontal; textura acrílica nas faces internas das varandas.
+[D] (Arquitetura) (Alto) Fachada em porcelanato ventilado: placas 60 × 120 com inserts metálicos nas empenas e na fachada frontal; textura acrílica nas faces internas das varandas.
 [F] Fachada = Porcelanato ventilado
-[D] (Arquitetura) (Médio) Esquadrias de alumínio linha 30 com pintura eletrostática grafite e vidro laminado 6 mm nas varandas.
+[D] (Arquitetura) (Médio) Esquadrias de alumínio linha 30: pintura eletrostática grafite e vidro laminado 6 mm nas varandas.
 [F] Esquadrias = Alumínio
-[D] (Arquitetura) (Médio) Envidraçamento das varandas previsto na convenção do condomínio, com padrão único definido pela incorporadora.
+[D] (Arquitetura) (Médio) Envidraçamento das varandas na convenção: padrão único definido pela incorporadora, previsto na convenção do condomínio.
 
 [P] Amostra física do porcelanato e mock-up da fixação para aprovação da Cambará."""
 
@@ -209,8 +209,8 @@ ATA_05 = """Análise do comunique-se da prefeitura sobre o projeto legal protoco
 [D] (Urbanismo) (Alto) Atender ao comunique-se: recuar o subsolo 1 em 1,50 m na frente do lote e ampliar o jardim sobre solo natural na faixa frontal.
 [F] Vagas de garagem = 70
 [F] Área construída total prevista = 8.620,00
-[D] (Urbanismo) (Médio) Três vagas acessíveis e duas para idosos no subsolo 1, sem reduzir as vagas privativas; as vagas de visitantes vão para o térreo.
-[D] (Geral) (Médio) Prazo de projeto estendido em 1 mês por causa da reanálise da prefeitura.
+[D] (Urbanismo) (Médio) Vagas acessíveis e para idosos no subsolo 1: três acessíveis e duas para idosos, sem reduzir as vagas privativas; as de visitantes vão para o térreo.
+[D] (Geral) (Médio) Prazo de projeto estendido em 1 mês: reanálise da prefeitura após o comunique-se.
 [F] Prazo previsto = 15
 
 [P] Reapresentar o projeto legal com as correções até 15/04/2026."""
@@ -221,11 +221,11 @@ ATA_06 = """Revisão de custos (engenharia de valor), com a equipe de orçamento
 2. Os maiores desvios: fachada ventilada em todas as faces (+ R$ 1,4 milhão) e aquecimento a gás individual (shafts e chaminés em todas as unidades).
 3. A Veio apresentou o sistema central coletivo com apoio solar e medição individual de água quente.
 
-[D] (Orçamento) (Alto) Orçamento paramétrico do anteprojeto em R$ 41,2 milhões (CUB + 18% de itens fora do CUB), acima da meta de R$ 39 milhões.
+[D] (Orçamento) (Alto) Orçamento paramétrico de R$ 41,2 milhões: CUB + 18% de itens fora do CUB, acima da meta de R$ 39 milhões.
 [F] Orçamento estimado = 41.200.000,00
-[D] (Hidrossanitário) (Alto) Revisão da {D:aquecimento_individual}: aquecimento central coletivo a gás com apoio solar e medição individual de água quente.
+[D] (Hidrossanitário) (Alto) Aquecimento central coletivo a gás (revisão da {D:aquecimento_individual}): com apoio solar e medição individual de água quente.
 [F] Aquecimento de água = Gás central coletivo
-[D] (Arquitetura) (Médio) Revisão da {D:fachada_ventilada}: porcelanato ventilado só na fachada frontal; empenas laterais em textura acrílica com frisos.
+[D] (Arquitetura) (Médio) Porcelanato ventilado só na fachada frontal (revisão da {D:fachada_ventilada}): empenas laterais em textura acrílica com frisos.
 [F] Fachada = Mista
 [D] (Orçamento) (Alto) Nova meta de orçamento depois da engenharia de valor: R$ 39,6 milhões.
 [F] Orçamento estimado = 39.600.000,00
@@ -238,9 +238,9 @@ ATA_07 = """Revisão do pavimento de cobertura.
 2. Proposta: transformar o 12º pavimento e o ático em duas coberturas duplex com terraço e piscina privativa.
 3. A Calço avaliou o impacto: reforço local da laje do terraço, sem mudar a malha de pilares.
 
-[D] (Arquitetura) (Alto) Último pavimento convertido em 2 coberturas duplex com terraço e piscina privativa, no lugar de 4 apartamentos tipo.
+[D] (Arquitetura) (Alto) Duas coberturas duplex no último pavimento: terraço e piscina privativa, no lugar de 4 apartamentos tipo.
 [F] Nº de unidades = 46
-[D] (Estrutura) (Médio) Reforço da laje do terraço da cobertura para as piscinas privativas (sobrecarga de 15 kN/m² na área das piscinas).
+[D] (Estrutura) (Médio) Reforço da laje do terraço da cobertura: sobrecarga de 15 kN/m² na área das piscinas privativas.
 
 [P] Confirmar com o comercial quantas vagas cada cobertura terá."""
 
@@ -250,7 +250,7 @@ ATA_08_RASCUNHO = """Compatibilização final do executivo (rascunho — ainda n
 2. A Veio propõe passar os dutos pela laje nervurada, entre as nervuras.
 3. A Calço precisa confirmar as furações.
 
-[D] (HVAC) (Médio) Dutos de exaustão das churrasqueiras passam entre as nervuras, com furação confirmada pela Calço.
+[D] (HVAC) (Médio) Dutos de exaustão entre as nervuras: passagem dos dutos das churrasqueiras, com furação confirmada pela Calço.
 [P] Calço confirmar a furação das nervuras no térreo e no 1º tipo."""
 
 # ------------------------------------------------------------------ etapas (ordem cronológica)
