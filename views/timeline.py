@@ -1733,6 +1733,11 @@ def build_timeline_view(
                 else []
             ),
             _item(ft.Icons.MANAGE_ACCOUNTS, "Minha conta (senha)", abrir_conta),
+            ft.ListTile(  # abre a página de ajuda numa aba nova (servida em /ajuda)
+                leading=ft.Icon(ft.Icons.HELP_OUTLINE, color=ft.Colors.ON_SURFACE_VARIANT),
+                title=ft.Text("Ajuda"),
+                url=ft.Url("/ajuda", target=ft.UrlTarget.BLANK),
+            ),
             _item(ft.Icons.LOGOUT, "Sair", on_logout or (lambda _: None)),
         ],
     )

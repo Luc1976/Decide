@@ -73,6 +73,8 @@ def build_login_view(on_login, page=None, on_cadastro=None, on_esqueci=None, on_
         ft.TextButton(content="Criar conta grátis (30 dias)", on_click=lambda _: mostrar("cadastro")),
         ft.TextButton(content="Esqueci minha senha", on_click=lambda _: mostrar("esqueci")),
         ft.TextButton(content="Ver planos e assinar", on_click=ir_planos),
+        ft.TextButton(content="Ajuda", icon=ft.Icons.HELP_OUTLINE,
+                      url=ft.Url("/ajuda", target=ft.UrlTarget.BLANK)),
     ]
 
     if page is not None:  # carrega o usuário guardado sem bloquear a tela

@@ -63,6 +63,9 @@ if MODO_WEB:
         from webhook_asaas import registrar_rota_webhook
 
         registrar_rota_webhook(asgi)
+        from ajuda_web import registrar_rota_ajuda
+
+        registrar_rota_ajuda(asgi)
         from icones_web import registrar_rota_icones
 
         registrar_rota_icones(asgi)
