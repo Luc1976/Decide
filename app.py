@@ -17,6 +17,7 @@ from views.admin import painel_admin
 from views.planos import build_planos_view
 from views.atas import build_atas_view
 from views.documentos import build_documentos_view
+from views.cronograma import build_cronograma_view
 from views.ficha import build_ficha_view
 from views.login import build_login_view
 from views.pendencias import build_pendencias_view
@@ -125,6 +126,7 @@ def main(page: ft.Page):
                 abrir_plataforma,
                 trocar_tema,
                 on_open_painel=abrir_painel,
+                on_open_cronograma=abrir_cronograma,
             )
         )
 
@@ -166,6 +168,9 @@ def main(page: ft.Page):
                 abrir_documentos,
             )
         )
+
+    def montar_cronograma():
+        mostrar_view(build_cronograma_view(page, projeto_ativo, usuario_logado, sair, voltar_timeline))
 
     def montar_documentos():
         mostrar_view(build_documentos_view(page, projeto_ativo, usuario_logado, sair, abrir_ficha))
@@ -238,6 +243,9 @@ def main(page: ft.Page):
 
     async def abrir_ficha(_=None):
         await page.push_route("/ficha")
+
+    async def abrir_cronograma(_=None):
+        await page.push_route("/cronograma")
 
     async def abrir_pendencias(_=None):
         await page.push_route("/pendencias")
@@ -332,6 +340,8 @@ def main(page: ft.Page):
             montar_pendencias()
         elif page.route == "/documentos":
             montar_documentos()
+        elif page.route == "/cronograma":
+            montar_cronograma()
         else:
             asyncio.create_task(page.push_route("/timeline"))
 

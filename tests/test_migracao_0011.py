@@ -4,7 +4,7 @@ import datetime
 from sqlalchemy import text
 
 from nucleo.db import criar_engine
-from nucleo.migracoes import atualizar_banco, revisao_atual, voltar_banco
+from nucleo.migracoes import atualizar_banco, revisao_atual, revisao_mais_nova, voltar_banco
 
 
 def _banco_em_0010(tmp_path):
@@ -37,7 +37,7 @@ def _ficha(eng, pid):
 def test_migra_padrao_para_campos_com_historico(tmp_path):
     eng = _banco_em_0010(tmp_path)
     atualizar_banco(eng)
-    assert revisao_atual(eng) == "0011"
+    assert revisao_atual(eng) == revisao_mais_nova()
     aurora = _ficha(eng, 1)
     assert aurora[("Programa", "Uso / tipologia")] == "Residencial"
     assert aurora[("Sistemas construtivos", "Sistema estrutural")] == "Concreto armado convencional"

@@ -301,6 +301,48 @@ def _secao_documentos(documentos, estilos, com_titulo: bool = True):
     return elementos
 
 
+def _secao_cronograma(dados, estilos):
+    """Tabela da versão atual (início, entrega, desvio em relação à versão 1) e as versões."""
+    import cronograma_calculos as calc
+
+    elementos = _titulo_secao(f"Cronograma (versão {dados['numero']})", estilos, 5 * cm)
+    desvios, removidos = calc.desvios(dados["atual"], dados["v1"]) if dados["numero"] > 1 else ({}, [])
+    cabecalho = [Paragraph(f'<font color="#FFFFFF"><b>{t}</b></font>', estilos["rotulo"])
+                 for t in ("Etapa / marco", "Início", "Entrega", "Desvio da entrega (vs. versão 1)")]
+    linhas = [cabecalho]
+    for item in dados["atual"]:
+        d = desvios.get(calc.chave(item.nome))
+        if dados["numero"] == 1:
+            desvio = "-"
+        elif d is None or d.novo:
+            desvio = "item novo"
+        else:
+            cor = "#B45309" if d.entrega_dias > 0 else "#15803D"
+            desvio = f'<font color="{cor}"><b>{calc.texto_desvio(d.entrega_dias)}</b></font>'
+        nome = f"<b>{_p(item.nome)}</b>" + (' <font size="8" color="#5F6B7A">(marco)</font>' if item.tipo == "marco" else "")
+        linhas.append([Paragraph(nome, estilos["rotulo"]),
+                       Paragraph("-" if item.tipo == "marco" else f"{item.inicio:%d/%m/%Y}", estilos["rotulo"]),
+                       Paragraph(f"{item.entrega:%d/%m/%Y}", estilos["rotulo"]),
+                       Paragraph(desvio, estilos["rotulo"])])
+    tabela = Table(linhas, colWidths=[6.2 * cm, 2.7 * cm, 2.7 * cm, 5.4 * cm], repeatRows=1)
+    estilo = [
+        ("BACKGROUND", (0, 0), (-1, 0), AZUL),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LINEBELOW", (0, 0), (-1, -1), 0.4, colors.HexColor("#D5DAE1")),
+        ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]
+    estilo += [("BACKGROUND", (0, i), (-1, i), CINZA_CLARO) for i in range(2, len(linhas), 2)]
+    tabela.setStyle(TableStyle(estilo))
+    elementos.append(tabela)
+    if removidos:
+        elementos.append(Paragraph("Saíram do cronograma: " + _p(", ".join(removidos)), estilos["pequeno"]))
+    elementos.append(Spacer(1, 6))
+    elementos.append(_tabela_chave_valor(
+        [(f"Versão {n} · {quando:%d/%m/%Y}", f"{origem} ({autor})") for n, quando, autor, origem in dados["versoes"]],
+        estilos))
+    return elementos
+
+
 def gerar_documentos_pdf(destino: Path, projeto, documentos, gerado_por: str, nome_app: str = "Decidiu",
                          agora: datetime = None, logo_empresa=None, logo_cliente=None) -> int:
     """PDF só com o checklist de documentos de referência. Devolve quantos itens entraram."""
@@ -376,8 +418,10 @@ def gerar_relatorio_pdf(
     logo_empresa=None,
     logo_cliente=None,
     documentos=None,
+    cronograma=None,
 ) -> int:
     """Grava o PDF em 'destino' e devolve quantas decisões entraram.
+    cronograma: dados de nucleo.servicos.cronograma.para_relatorio (opcional).
     logo_empresa / logo_cliente: caminhos de imagens para o cabeçalho (opcionais).
     documentos: [(documento, [arquivos])] para a seção Documentos de referência (opcional)."""
     agora = agora or datetime.now()
@@ -414,6 +458,8 @@ def gerar_relatorio_pdf(
 
     if incluir_ficha:
         story += _secao_ficha(caracteristicas, estilos)
+    if cronograma:
+        story += _secao_cronograma(cronograma, estilos)
     if documentos:
         story += _secao_documentos(documentos, estilos)
 

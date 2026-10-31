@@ -37,7 +37,9 @@ from nucleo.ator import Ator  # noqa: E402
 from nucleo.db import endereco_seguro, engine, nova_sessao  # noqa: E402
 from nucleo.migracoes import revisao_atual  # noqa: E402
 from nucleo.numeracao import codigo_decisao  # noqa: E402
+from cronograma_calculos import Item as ItemCronograma  # noqa: E402
 from nucleo.servicos import atas as s_atas  # noqa: E402
+from nucleo.servicos import cronograma as s_cronograma  # noqa: E402
 from nucleo.servicos import decisoes as s_decisoes  # noqa: E402
 from nucleo.servicos import documentos as s_documentos  # noqa: E402
 from nucleo.servicos import ficha as s_ficha  # noqa: E402
@@ -46,12 +48,12 @@ from nucleo.servicos import pendencias as s_pendencias  # noqa: E402
 from nucleo.servicos import projetos as s_projetos  # noqa: E402
 from nucleo.servicos import usuarios as s_usuarios  # noqa: E402
 from nucleo.tabelas import (  # noqa: E402
-    AtaAdendo, Caracteristica, CaracteristicaHistorico, Decisao, DocumentoArquivo,
+    AtaAdendo, Caracteristica, CaracteristicaHistorico, CronogramaVersao, Decisao, DocumentoArquivo,
     DocumentoReferencia, MembroProjeto, Organizacao, PadraoConstrutivo, Pendencia, Projeto,
     RegistroAuditoria, Reuniao, Usuario, UsoIA,
 )
 
-REVISAO_ESPERADA = "0011"   # sistemas construtivos como campos da ficha (migração 0011)
+REVISAO_ESPERADA = "0012"   # cronograma macro (migração 0012)
 FUSO = ZoneInfo("America/Sao_Paulo")
 _REF = re.compile(r"\{D:(\w+)\}")
 
@@ -93,6 +95,7 @@ class Carga:
                 (Pendencia, Pendencia.projeto_id, "data_criacao"),
                 (Pendencia, Pendencia.projeto_id, "data_resolucao"),
                 (DocumentoReferencia, DocumentoReferencia.projeto_id, "data_atualizacao"),
+                (CronogramaVersao, CronogramaVersao.projeto_id, "criado_em"),
             ]
             for tabela, coluna_projeto, campo in por_projeto:
                 coluna = getattr(tabela, campo)
@@ -123,6 +126,11 @@ class Carga:
         numero = self.decisoes[chave]
         return self.s.exec(select(Decisao.id).where(Decisao.projeto_id == self.pid,
                                                     Decisao.numero == numero)).one()
+
+    @staticmethod
+    def itens_cronograma(linhas):
+        return [ItemCronograma(l["nome"], l["tipo"], l["inicio"], l["entrega"], l["depende"], l["padrao"])
+                for l in linhas]
 
     def pendencia(self, trecho: str) -> Pendencia:
         achadas = [p for p in self.s.exec(select(Pendencia).where(Pendencia.projeto_id == self.pid)).all()
@@ -210,6 +218,11 @@ class Carga:
             else:
                 s_pendencias.resolver(s, ator, p.id, decisao_id=self.decisao_id(e["decisao"]),
                                       observacao=e.get("observacao", ""))
+        elif tipo == "cronograma":
+            s_cronograma.criar(s, ator, self.pid, self.itens_cronograma(e["itens"]))
+        elif tipo == "revisao_cronograma":
+            s_cronograma.revisar(s, ator, self.pid, self.itens_cronograma(e["itens"]),
+                                 decisao_id=self.decisao_id(e["decisao"]))
         elif tipo == "cancelar":
             p = self.pendencia(e["pendencia"])
             s_pendencias.cancelar(s, ator, p.id, e["motivo"])
@@ -263,6 +276,8 @@ def zerar(s: Session) -> bool:
         for tabela in (CaracteristicaHistorico, Caracteristica, PadraoConstrutivo, Pendencia,
                        DocumentoReferencia):
             s.exec(tabela.__table__.delete().where(tabela.projeto_id.in_(pids)))
+        for pid in pids:  # antes das decisões: as versões apontam para elas
+            s_cronograma.excluir_do_projeto(s, pid)
         atas = select(Reuniao.id).where(Reuniao.projeto_id.in_(pids))
         s.exec(AtaAdendo.__table__.delete().where(AtaAdendo.reuniao_id.in_(atas)))
         s.exec(Decisao.__table__.delete().where(Decisao.projeto_id.in_(pids)))

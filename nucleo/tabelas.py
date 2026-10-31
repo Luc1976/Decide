@@ -288,3 +288,31 @@ class UsoIA(SQLModel, table=True):
     organizacao_id: int = Field(index=True)  # sem FK: o registro sobrevive
     ano_mes: str = Field(max_length=7)       # "AAAA-MM"
     quantidade: int = 0
+
+
+# ---------------------------------------------------------------- cronograma macro (migração 0012)
+
+class CronogramaVersao(SQLModel, table=True):
+    """Uma versão do cronograma do projeto. Nunca é alterada depois de gravada: cada revisão
+    cria a versão seguinte, ligada à decisão que a motivou (a versão 1 não tem decisão)."""
+    __table_args__ = (UniqueConstraint("projeto_id", "numero", name="uq_cronograma_projeto_numero"),)
+    id: Optional[int] = Field(default=None, primary_key=True)
+    projeto_id: int = Field(foreign_key="projeto.id", index=True)
+    numero: int
+    criado_em: datetime.datetime = Field(default_factory=_agora)
+    autor: str = ""
+    decisao_id: Optional[int] = Field(default=None, foreign_key="decisao.id")
+    observacao: str = ""
+
+
+class CronogramaItem(SQLModel, table=True):
+    """Etapa (início e entrega) ou marco (uma data: entrega = início) de uma versão."""
+    id: Optional[int] = Field(default=None, primary_key=True)
+    versao_id: int = Field(foreign_key="cronogramaversao.id", index=True)
+    ordem: int = 0
+    nome: str
+    tipo: str = "etapa"                     # "etapa" ou "marco"
+    inicio: datetime.date
+    entrega: datetime.date
+    depende_da_anterior: bool = True        # cadeia de dependência (cronograma_calculos.py)
+    padrao: bool = False                    # veio da lista padrão (Kick-off, Anteprojeto...)

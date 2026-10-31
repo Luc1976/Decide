@@ -200,6 +200,9 @@ devolvem o arquivo.
 | POST | `…/pendencias/{pendencia_id}/resolver` · `/cancelar` · `/reabrir` | Mudar a situação |
 | GET / PUT | `/projetos/{projeto_id}/ficha` | Ficha com indicadores / gravar campos, inclusive os sistemas construtivos e alturas da tipologia |
 | GET | `/projetos/{projeto_id}/ficha/historico` | Histórico com origem ("Decisão D-005 · Ata 04") |
+| GET | `/projetos/{projeto_id}/cronograma` | Cronograma: versão atual (ou `?versao=N`), itens com desvio da entrega em relação à versão 1, lista de versões |
+| POST | `/projetos/{projeto_id}/cronograma` | Criar a versão 1 (linha de base) |
+| POST | `/projetos/{projeto_id}/cronograma/revisoes` | Revisar: versão seguinte ligada a `decisao_id` ou `nova_decisao` (criada na mesma gravação) |
 | GET | `/projetos/{projeto_id}/relatorios/decisoes.pdf` | Relatório de decisões (qualquer membro) |
 | GET | `/organizacao` | A minha organização |
 | PUT | `/organizacao` | Renomear (admin) |
@@ -225,6 +228,7 @@ O esquema do banco agora é controlado pelo Alembic. Cada mudança no modelo vir
 | `0004` documentos de referência | Tabela `documentoreferencia` (checklist por projeto) e lista padrão nos projetos existentes. Rotas em `/projetos/{id}/documentos` |
 | `0005` arquivos dos documentos | Tabela `documentoarquivo` (um arquivo por linha, com `data_recebimento` e quem enviou); converte a coluna de texto `anexos` e a remove. Rotas `/documentos/{id}/arquivos` e `/documentos/relatorio.pdf` |
 | `0011` padrão construtivo na ficha | Só dados: copia `padraoconstrutivo` para campos da ficha ("Sistemas construtivos" e "Uso / tipologia"), com histórico de autor "Migração 0011"; "Multifamiliar" vira "Residencial". A tabela antiga fica, sem uso. O downgrade restaura os valores anteriores |
+| `0012` cronograma | Cria `cronogramaversao` (número, autor, decisão que motivou) e `cronogramaitem` (etapas e marcos com início, entrega e "depende da anterior"). Nenhum dado existente é alterado |
 
 **Na partida**, o app Flet (`init_db`) e a API rodam `upgrade head`, que só aplica o que falta.
 No PostgreSQL há uma trava (`pg_advisory_xact_lock`), então os dois podem iniciar juntos.

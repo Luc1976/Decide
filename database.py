@@ -551,6 +551,22 @@ def listar_historico_ficha(projeto_id: int, limite: int = 200) -> List[Caracteri
         return s_ficha.consultar_historico(s, projeto_id, limite)
 
 
+def cronograma_para_relatorio(projeto_id: int):
+    """Seção "Cronograma" do relatório PDF (None se o projeto não tem cronograma)."""
+    from nucleo.servicos import cronograma as s_cronograma
+
+    with nova_sessao() as s:
+        return s_cronograma.para_relatorio(s, projeto_id)
+
+
+def versoes_cronograma_por_decisao(projeto_id: int) -> dict:
+    """{decisao_id: número da versão do cronograma} (selo "Impacta cronograma")."""
+    from nucleo.servicos import cronograma as s_cronograma
+
+    with nova_sessao() as s:
+        return s_cronograma.versoes_por_decisao(s, projeto_id)
+
+
 def mapa_origens_ficha(projeto_id: int) -> dict:
     with nova_sessao() as s:
         return s_ficha.consultar_origens(s, projeto_id)
