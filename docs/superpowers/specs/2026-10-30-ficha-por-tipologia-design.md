@@ -29,8 +29,13 @@ campos comuns da ficha: têm histórico e podem ser alterados por decisões e at
 - Campos dependentes seguem a mesma regra da tipologia: se o campo do qual dependem
   muda e eles deixam de aparecer, são limpos ao salvar.
 
+- Revisão de 31/10: entram parâmetros numéricos por tipologia (alturas entre lajes,
+  pés-direitos, espessura de contrapiso, alturas de portões e doca, ABL, lojas,
+  potência), listados na seção 6.2.
+
 **Fora do escopo:** catálogo editável pelo escritório (opções B e C), campos novos
-de características além do que está na seção 6, mudanças nos indicadores calculados.
+de características além do que está na seção 6, mudanças nos indicadores calculados,
+validação de faixas dos números (ex.: pé-direito mínimo de norma).
 
 ## 2. Comportamento na tela
 
@@ -49,7 +54,11 @@ de características além do que está na seção 6, mudanças nos indicadores c
 - Com "Uso / tipologia" = Outro (tipologia fora da lista), o card mostra o aviso
   "Esta tipologia não tem sistemas construtivos no catálogo. Use Outras características."
 - Campos do catálogo podem morar em qualquer card (Programa, Terreno…); aparecem
-  depois dos campos fixos daquele card.
+  depois dos campos fixos daquele card. Cards que só existem no catálogo aparecem
+  depois de *Programa*, na ordem: **Sistemas construtivos**, **Alturas e dimensões**.
+  Um card do catálogo sem nenhum campo para a tipologia escolhida não aparece.
+- Campos numéricos (sem lista de opções) são caixas de texto com a unidade no rótulo
+  e teclado numérico no celular. O valor é gravado como digitado (ex.: "2,95").
 - Ao salvar, os campos do catálogo que não estão visíveis (outra tipologia ou
   dependência não atendida) são limpos.
 - Leitor (cliente) vê tudo, com as listas desabilitadas.
@@ -70,6 +79,7 @@ class CampoCatalogo:
     valores_que_mostram: tuple = ()       # valores de depende_de que fazem aparecer
 
 TIPOLOGIAS: tuple = (...)                 # as 7 tipologias, na ordem da lista
+GRUPOS_DO_CATALOGO = ("Sistemas construtivos", "Alturas e dimensões")  # cards novos, nesta ordem
 CAMPOS: dict[str, tuple[CampoCatalogo, ...]]  # tipologia -> campos, na ordem da tela
 OUTRO = "Outro"
 ```
@@ -180,6 +190,34 @@ Nervurada · Treliçada · Protendida · Lisa (cogumelo).
 | Data Center | Redundância | N · N+1 · 2N · 2N+1 |
 | Data Center | Climatização | Expansão direta (DX) · Água gelada · Free cooling |
 
+### 6.2 Parâmetros numéricos por tipologia (revisão de 31/10)
+
+Todos são campos de texto numérico, sem lista. A coluna "Card" diz onde aparecem.
+
+| Parâmetro | Unidade | Card | Residencial | Comercial | Corporativo | Industrial | Shopping Center | Data Center |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Piso a piso – pavimento tipo | m | Alturas e dimensões | ✔ | ✔ | ✔ | | | |
+| Piso a piso – térreo | m | Alturas e dimensões | ✔ | ✔ | ✔ | | | |
+| Piso a piso – subsolo / estacionamento | m | Alturas e dimensões | ✔ | ✔ | ✔ | | | |
+| Piso a piso – cobertura | m | Alturas e dimensões | ✔ | ✔ | ✔ | | | |
+| Piso a piso – casa de máquinas e barrilete | m | Alturas e dimensões | ✔ | ✔ | ✔ | | | |
+| Pé-direito livre mínimo – pavimento tipo | m | Alturas e dimensões | ✔ | ✔ | ✔ | | | |
+| Pé-direito – sanitários | m | Alturas e dimensões | ✔ | ✔ | ✔ | | | |
+| Pé-direito – cozinhas | m | Alturas e dimensões | ✔ | ✔ | ✔ | | | |
+| Espessura do contrapiso | cm | Alturas e dimensões | ✔ | ✔ | ✔ | | ✔ | |
+| Altura dos portões | m | Alturas e dimensões | | | | ✔ | | |
+| Altura da doca de carga e descarga | m | Alturas e dimensões | | | | ✔ | | |
+| ABL – área bruta locável | m² | Programa | | | | | ✔ | |
+| Nº de lojas âncoras | – | Programa | | | | | ✔ | |
+| Nº de lojas satélites | – | Programa | | | | | ✔ | |
+| Pé-direito – circulações comuns | m | Alturas e dimensões | | | | | ✔ | |
+| Pé-direito – lojas | m | Alturas e dimensões | | | | | ✔ | |
+| Potência do data center | MW | Programa | | | | | | ✔ |
+| Pé-direito mínimo do data hall | m | Alturas e dimensões | | | | | | ✔ |
+
+O "Pé-direito livre" pedido primeiro é o "Pé-direito livre mínimo – pavimento tipo".
+"Piso a piso" é a distância entre lajes (de face superior a face superior).
+
 ## 7. O que muda em cada parte
 
 | Parte | Mudança |
@@ -191,7 +229,7 @@ Nervurada · Treliçada · Protendida · Lisa (cogumelo).
 | `views/ficha.py` | Tela única (seção 2) |
 | `views/questionario_sistemas.py`, `ficha.py` e `questionario_sistemas.py` da raiz | Removidos |
 | `database.py` | Saem `obter_/salvar_padrao_construtivo` |
-| `relatorio_pdf.py` | Card "Sistemas construtivos" depois de *Programa* |
+| `relatorio_pdf.py` | Cards "Sistemas construtivos" e "Alturas e dimensões" depois de *Programa* |
 | `api` | Sai `/padrao-construtivo`; `FichaSaida` sem `padrao`; `/opcoes` devolve `tipologias` e `campos_por_tipologia` |
 | `migracoes/versions/0011_padrao_para_ficha.py` | Nova (seção 5) |
 | `nucleo/tabelas.py` | `PadraoConstrutivo` continua (tabela mantida), com nota de que não é mais usada |
@@ -208,6 +246,8 @@ Nervurada · Treliçada · Protendida · Lisa (cogumelo).
   e de sistema da nova tipologia fecha sem erro.
 - Migração `0011`: banco com padrão construtivo migra para campos e histórico; o
   `downgrade` restaura o valor anterior de "Uso / tipologia".
+- Catálogo (revisão de 31/10): os parâmetros da seção 6.2 aparecem só nas tipologias
+  marcadas; "Alturas e dimensões" não aparece para Condomínio de lotes.
 - Tela: a ficha monta como Editor e como Leitor; escolher a tipologia mostra o card;
   a cascata mostra e esconde "Tipo de laje"; "Outro" mostra o campo de texto; salvar
   limpa os campos invisíveis.
