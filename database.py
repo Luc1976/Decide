@@ -566,16 +566,6 @@ def listar_alteracoes_ficha_ata(reuniao_id: int) -> List[CaracteristicaHistorico
         return s_ficha.consultar_alteracoes_da_ata(s, reuniao_id)
 
 
-def obter_padrao_construtivo(projeto_id: int) -> Optional[PadraoConstrutivo]:
-    with nova_sessao() as s:
-        return s_ficha.consultar_padrao(s, projeto_id)
-
-
-def salvar_padrao_construtivo(projeto_id: int, dados: dict, usuario_id: Optional[int] = None) -> PadraoConstrutivo:
-    with nova_sessao() as s:
-        return s_ficha.salvar_padrao(s, _ator(s, usuario_id), projeto_id, dados)
-
-
 def gerar_rascunho_ata(projeto_id: int, usuario_id: Optional[int], transcricao: str) -> dict:
     """Rascunho de ata pela IA, respeitando o limite mensal do plano da organização.
     Devolve {"texto", "participantes", "avisos", "uso": {"usado", "limite", "plano"}}.

@@ -53,3 +53,17 @@ def test_checklist_aceita_os_dois_formatos():
     itens = [{"tarefa": "Pela tela", "feito": True}, {"texto": "Pela API", "feito": False}]
     assert [texto_do_item(i) for i in itens] == ["Pela tela", "Pela API"]
     assert _lista_checklist(json.dumps(itens)) == [("Pela tela", True), ("Pela API", False)]
+
+
+def test_demo_usa_os_sistemas_construtivos_da_ficha(demo):
+    """A troca de laje da D-009 para a D-010 aparece no histórico da ficha, ligada à decisão."""
+    helena, _, projeto = demo
+    ficha = {(c.grupo, c.nome): c.valor for c in db.listar_caracteristicas(projeto.id)}
+    assert ficha[("Programa", "Uso / tipologia")] == "Residencial"
+    assert ficha[("Sistemas construtivos", "Tipo de laje")] == "Nervurada"
+    assert ficha[("Alturas e dimensões", "Piso a piso – pavimento tipo")] == "2,95"
+    origens = db.mapa_origens_ficha(projeto.id)
+    laje = [(h.valor_anterior, h.valor_novo, origens.get(h.id)) for h in db.listar_historico_ficha(projeto.id)
+            if h.nome == "Tipo de laje"]
+    assert ("Maciça", "Nervurada", "Decisão D-010 · Ata 03") in laje
+    assert (None, "Maciça", "Decisão D-009") in laje

@@ -3,7 +3,7 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from api.esquemas.comum import Saida, Tipologia
+from api.esquemas.comum import Saida
 
 
 class CampoFichaSaida(BaseModel):
@@ -22,29 +22,9 @@ class IndicadorSaida(BaseModel):
     alerta: bool
 
 
-class PadraoConstrutivoSaida(Saida):
-    tipologia: str
-    ind_estrutura: Optional[str] = None
-    ind_vedacao: Optional[str] = None
-    ind_carga_piso: Optional[float] = Field(default=None, ge=0)
-    ind_pavimento_externo: Optional[str] = None
-    multi_sistema_principal: Optional[str] = None
-    multi_tipo_laje: Optional[str] = None
-    corp_fachada: Optional[str] = None
-    dc_tier_redundancia: Optional[str] = None
-    shop_estrutura: Optional[str] = None
-    shop_cobertura: Optional[str] = None
-
-
-class PadraoConstrutivoEntrada(PadraoConstrutivoSaida):
-    """Só os campos da tipologia escolhida são guardados; os demais são limpos."""
-    tipologia: Tipologia
-
-
 class FichaSaida(BaseModel):
     campos: List[CampoFichaSaida]
     indicadores: List[IndicadorSaida]
-    padrao: Optional[PadraoConstrutivoSaida] = None
 
 
 class ItemFichaEntrada(BaseModel):

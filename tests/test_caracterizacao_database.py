@@ -128,12 +128,15 @@ def test_salvar_ficha_e_campo_personalizado(admin, projeto_padrao):
     assert len(db.listar_historico_ficha(pid)) == 3
 
 
-def test_padrao_construtivo(admin, projeto_padrao):
-    p = db.salvar_padrao_construtivo(projeto_padrao.id, {"tipologia": "Industrial", "ind_carga_piso": 5.0}, admin.id)
-    assert p.ind_carga_piso == 5.0
-    p = db.salvar_padrao_construtivo(projeto_padrao.id, {"tipologia": "Multifamiliar", "multi_tipo_laje": "Maciça"}, admin.id)
-    assert p.ind_carga_piso is None and p.multi_tipo_laje == "Maciça"
-    assert db.obter_padrao_construtivo(projeto_padrao.id).tipologia == "Multifamiliar"
+def test_sistemas_construtivos_na_ficha(admin, projeto_padrao):
+    """Substitui o antigo padrão construtivo: agora são campos da ficha (tests/test_ficha_tipologia.py)."""
+    pid = projeto_padrao.id
+    db.salvar_caracteristicas(pid, [("Programa", "Uso / tipologia", "", "Industrial"),
+                                    ("Sistemas construtivos", "Carga de piso", "tf/m²", "5")], "Lucas",
+                              usuario_id=admin.id)
+    db.salvar_caracteristicas(pid, [("Programa", "Uso / tipologia", "", "Residencial")], "Lucas", usuario_id=admin.id)
+    ficha = {c.nome: c.valor for c in db.listar_caracteristicas(pid)}
+    assert ficha["Uso / tipologia"] == "Residencial" and "Carga de piso" not in ficha
 
 
 # ---------------------------------------------------------------- atas

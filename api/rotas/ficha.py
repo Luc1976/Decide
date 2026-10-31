@@ -11,8 +11,6 @@ from api.esquemas.ficha import (
     FichaGravadaSaida,
     FichaSaida,
     HistoricoFichaSaida,
-    PadraoConstrutivoEntrada,
-    PadraoConstrutivoSaida,
 )
 from api.rotas.pdf import resposta_pdf
 from nucleo.servicos import ficha, relatorios
@@ -25,7 +23,8 @@ def obter(projeto_id: int, ator: AtorAtual, s: Sessao):
     return ficha.obter(s, ator, projeto_id)
 
 
-@rotas.put("/ficha", response_model=FichaGravadaSaida, summary="Gravar campos (só o que mudou entra no histórico)")
+@rotas.put("/ficha", response_model=FichaGravadaSaida,
+           summary="Gravar campos (só o que mudou entra no histórico; inclui os sistemas da tipologia)")
 def salvar(projeto_id: int, dados: FichaEntrada, ator: AtorAtual, s: Sessao):
     itens = [(i.grupo, i.nome, i.unidade or "", i.valor) for i in dados.itens]
     return FichaGravadaSaida(campos_alterados=ficha.salvar(s, ator, projeto_id, itens))
@@ -35,16 +34,6 @@ def salvar(projeto_id: int, dados: FichaEntrada, ator: AtorAtual, s: Sessao):
 def historico(projeto_id: int, ator: AtorAtual, s: Sessao, limite: int = 200):
     return [HistoricoFichaSaida.model_validate(h).model_copy(update={"origem": origem})
             for h, origem in ficha.historico(s, ator, projeto_id, min(max(limite, 1), 1000))]
-
-
-@rotas.get("/padrao-construtivo", response_model=Optional[PadraoConstrutivoSaida])
-def obter_padrao(projeto_id: int, ator: AtorAtual, s: Sessao):
-    return ficha.obter_padrao(s, ator, projeto_id)
-
-
-@rotas.put("/padrao-construtivo", response_model=PadraoConstrutivoSaida)
-def salvar_padrao(projeto_id: int, dados: PadraoConstrutivoEntrada, ator: AtorAtual, s: Sessao):
-    return ficha.salvar_padrao(s, ator, projeto_id, dados.model_dump(exclude_none=True))
 
 
 @rotas.get("/relatorios/decisoes.pdf", response_class=Response, tags=["Relatórios"],

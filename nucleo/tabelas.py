@@ -119,6 +119,8 @@ class TipologiaProjeto(str, Enum):
 
 
 class PadraoConstrutivo(SQLModel, table=True):
+    """SEM USO desde a migração 0011: os sistemas construtivos viraram campos da ficha
+    (catalogo_tipologias.py). A tabela fica no banco só para não apagar dados antigos."""
     id: Optional[int] = Field(default=None, primary_key=True)
     projeto_id: int = Field(foreign_key="projeto.id", index=True)
     tipologia: str

@@ -1,6 +1,6 @@
 # Ficha do empreendimento por tipologia — desenho
 
-Data: 30/10/2026 · Branch: `homologacao` · Situação: aguardando revisão do Lucas
+Data: 30/10/2026 · Branch: `homologacao` · Situação: aprovado em 31/10 e implementado
 
 ## 1. Objetivo
 

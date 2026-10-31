@@ -51,7 +51,7 @@ from nucleo.tabelas import (  # noqa: E402
     RegistroAuditoria, Reuniao, Usuario, UsoIA,
 )
 
-REVISAO_ESPERADA = "0010"   # última migração em migracoes/versions/ quando este seed foi escrito
+REVISAO_ESPERADA = "0011"   # sistemas construtivos como campos da ficha (migração 0011)
 FUSO = ZoneInfo("America/Sao_Paulo")
 _REF = re.compile(r"\{D:(\w+)\}")
 
@@ -170,8 +170,6 @@ class Carga:
                     s_projetos.definir_membro(s, ator, self.pid, u["username"], u["papel"])
         elif tipo == "ficha":
             s_ficha.salvar(s, ator, self.pid, e["itens"])
-        elif tipo == "padrao":
-            s_ficha.salvar_padrao(s, ator, self.pid, e["dados"])
         elif tipo == "documento":
             doc = s.exec(select(DocumentoReferencia).where(
                 DocumentoReferencia.projeto_id == self.pid, DocumentoReferencia.nome == e["nome"])).one()
@@ -184,10 +182,13 @@ class Carga:
                 descricao=self.refs(e["descricao"]), justificativa=self.refs(e["justificativa"]),
                 impacto=e["impacto"], alternativa_descartada=e.get("alternativa"),
                 data_decisao=quando.date(), checklist=e.get("checklist"),
-                alteracao_ficha=e.get("ficha"),
             )
             dec = s_decisoes.criar(s, ator, self.pid, dados)
             self.decisoes[e["chave"]] = dec.numero
+            ficha = e.get("ficha")  # um item (grupo, nome, unidade, valor) ou uma lista deles
+            if ficha:
+                s_ficha.salvar(s, ator, self.pid, ficha if isinstance(ficha, list) else [ficha],
+                               decisao_id=dec.id)
         elif tipo == "ata":
             self.ata(e, ator)
             return  # a ata carimba as próprias etapas (criação e fechamento)
@@ -233,8 +234,6 @@ class Carga:
             p = self.pendencia(item["pendencia"])
             s_pendencias.atualizar(s, ator, p.id, p.titulo, p.descricao, item["categoria"],
                                    item.get("responsavel", ""), item.get("prazo"))
-        if e.get("padrao"):
-            s_ficha.salvar_padrao(s, ator, self.pid, e["padrao"])
         self.carimbar(e["fechamento"])
 
     def executar(self) -> None:

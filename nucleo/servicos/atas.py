@@ -68,6 +68,20 @@ def _da_rota(s: Session, projeto_id: Optional[int], reuniao_id: int) -> Reuniao:
     return ata
 
 
+def _campos_para_texto(s: Session, projeto_id: int, texto: str) -> list:
+    """Campos que as linhas [F] desta ata podem usar. Se a própria ata troca a tipologia
+    (ou um sistema do qual outro depende), os campos da situação nova também valem."""
+    import catalogo_tipologias as catalogo
+
+    amplo = servico_ficha.consultar_campos(s, projeto_id)
+    conhecidos = {(g, n) for g, n, _ in amplo}
+    amplo += [(c.grupo, c.nome, c.unidade) for c in catalogo.todos_os_campos().values()
+              if (c.grupo, c.nome) not in conhecidos]
+    previstas, _ = analisar_alteracoes_ata(texto, amplo)  # 1ª leitura: só para simular
+    simular = {(g, n): v for _, g, n, _, v in previstas}
+    return servico_ficha.consultar_campos(s, projeto_id, simular=simular)
+
+
 # ---------------------------------------------------------------- leitura
 
 def listar(s: Session, ator: Ator, projeto_id: int, termo: str = "") -> List[Reuniao]:
@@ -100,7 +114,7 @@ def detalhes(s: Session, ator: Ator, reuniao_id: int, projeto_id: Optional[int] 
 def pre_visualizar(s: Session, ator: Ator, projeto_id: int, texto: str) -> dict:
     """O que o fechamento vai gerar, sem gravar nada (para o editor avisar antes)."""
     exigir(s, ator, projeto_id, EDITOR)
-    alteracoes, erros = analisar_alteracoes_ata(texto, servico_ficha.consultar_campos(s, projeto_id))
+    alteracoes, erros = analisar_alteracoes_ata(texto, _campos_para_texto(s, projeto_id, texto))
     return {
         "decisoes": extrair_decisoes(texto),
         "erros_decisoes": erros_das_decisoes(texto),
@@ -165,7 +179,7 @@ def fechar(s: Session, ator: Ator, reuniao_id: int, projeto_id: Optional[int] = 
     pid = ata.projeto_id
 
     # Valida as linhas [F] ANTES de criar qualquer coisa.
-    alteracoes_ficha, erros = analisar_alteracoes_ata(ata.texto, servico_ficha.consultar_campos(s, pid))
+    alteracoes_ficha, erros = analisar_alteracoes_ata(ata.texto, _campos_para_texto(s, pid, ata.texto))
     if erros:
         raise ValueError("Corrija as linhas [F]: " + "; ".join(erros) + ".")
     # Cada [D] precisa de disciplina e impacto padrão do app; senão nada é gravado.
@@ -205,6 +219,8 @@ def fechar(s: Session, ator: Ator, reuniao_id: int, projeto_id: Optional[int] = 
         numero_pendencia += 1
 
     s.flush()  # gera os ids das decisões
+    # Tipologia antes dos campos que dependem dela (a ordem das linhas na ata não importa).
+    alteracoes_ficha = servico_ficha.ordenar_para_aplicar(alteracoes_ficha, chave=lambda a: (a[1], a[2]))
     for indice, grupo, nome, unidade, valor in alteracoes_ficha:
         decisao = criadas[indice] if indice is not None else None
         servico_ficha.aplicar(

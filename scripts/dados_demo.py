@@ -15,6 +15,7 @@ como Orçamento.
 """
 from datetime import date, datetime
 
+from catalogo_tipologias import GRUPO_ALTURAS, GRUPO_SISTEMAS
 from models import GRUPO_OUTRAS
 
 # ------------------------------------------------------------------ identificação
@@ -79,6 +80,8 @@ CAMILA = f"Camila Rezende ({INSTALACOES})"
 MARCOS = f"Marcos Albuquerque ({PROJETO_CLIENTE})"
 
 O = GRUPO_OUTRAS  # "Outras características" (campos personalizados da ficha)
+SIS = GRUPO_SISTEMAS  # campos do catálogo da tipologia (catalogo_tipologias.py)
+ALT = GRUPO_ALTURAS
 
 # ------------------------------------------------------------------ ficha inicial
 # (grupo, nome, unidade, valor). Os campos em "Outras características" são personalizados
@@ -99,7 +102,7 @@ FICHA_INICIAL = [
     ("Parâmetros urbanísticos", "Gabarito / altura máxima", "m", "48,00"),
     ("Parâmetros urbanísticos", "Recuos (frontal / laterais / fundos)", "m",
      "5,00 / 2,50 (h/6 acima do 4º pav.) / 3,00"),
-    ("Programa", "Uso / tipologia", "", "Residencial multifamiliar vertical"),
+    ("Programa", "Uso / tipologia", "", "Residencial"),
     ("Programa", "Nº de unidades", "", "48"),
     ("Programa", "Nº de pavimentos", "", "Térreo + 12 tipo + 2 subsolos"),
     ("Programa", "Área construída total prevista", "m²", "8.400,00"),
@@ -111,25 +114,24 @@ FICHA_INICIAL = [
      "Unidades de 2 e 3 dormitórios para famílias jovens; lazer completo no térreo; "
      "VGV estimado de R$ 62 milhões; lançamento comercial no 1º semestre de 2026 e início "
      "de obra no 2º semestre de 2026."),
-    (O, "Sistema estrutural", "", "A definir"),
-    (O, "Fundações", "", "Aguardando sondagens"),
-    (O, "Fachada", "", "A definir"),
-    (O, "Esquadrias", "", "A definir"),
-    (O, "Aquecimento de água", "", "A definir"),
+    (SIS, "Tipo de empreendimento", "", "Edifício vertical"),
+    (SIS, "Vedações", "", "Bloco cerâmico"),
+    (ALT, "Piso a piso – pavimento tipo", "m", "2,80"),
+    (ALT, "Piso a piso – térreo", "m", "4,50"),
+    (ALT, "Piso a piso – subsolo / estacionamento", "m", "3,00"),
+    (ALT, "Piso a piso – cobertura", "m", "3,20"),
+    (ALT, "Piso a piso – casa de máquinas e barrilete", "m", "3,50"),
+    (ALT, "Pé-direito livre mínimo – pavimento tipo", "m", "2,60"),
+    (ALT, "Pé-direito – sanitários", "m", "2,30"),
+    (ALT, "Pé-direito – cozinhas", "m", "2,50"),
+    (ALT, "Espessura do contrapiso", "cm", "4"),
     (O, "Elevadores", "", "A definir"),
     (O, "Altura da edificação", "m", "40,10"),
     (O, "Situação do projeto legal", "", "Não protocolado"),
 ]
 
-# Padrão construtivo (template por tipologia). Opções do app para Multifamiliar:
-# sistema: Alvenaria estrutural | Concreto armado convencional | Paredes de concreto in loco
-# laje:    Maciça | Treliçada | Nervurada
-PADRAO_INICIAL = {"tipologia": "Multifamiliar",
-                  "multi_sistema_principal": "Concreto armado convencional",
-                  "multi_tipo_laje": "Maciça"}
-PADRAO_REVISADO = {"tipologia": "Multifamiliar",
-                   "multi_sistema_principal": "Concreto armado convencional",
-                   "multi_tipo_laje": "Nervurada"}
+# Sistemas construtivos: campos da ficha definidos pela tipologia (catalogo_tipologias.py).
+# Ficam vazios no início e são preenchidos pelas decisões (D-008, D-009...) e pelas atas.
 
 # ------------------------------------------------------------------ atas (texto)
 
@@ -172,8 +174,9 @@ ATA_03 = """Compatibilização estrutural do anteprojeto, com a Calço e a Veio.
 4. A Veio pediu que as prumadas hidráulicas fiquem fora das unidades.
 
 [D] (Estrutura) (Alto) Revisão da {D:estrutura_macica}: lajes nervuradas com cubetas plásticas (h = 30 cm) nos pavimentos tipo, no lugar das lajes maciças; elimina as vigas internas e reduz o número de pilares.
-[F] Sistema estrutural = Concreto armado convencional, lajes nervuradas h = 30 cm (cubetas plásticas)
+[F] Tipo de laje = Nervurada
 [D] (Arquitetura) (Médio) Piso a piso do pavimento tipo passa de 2,80 m para 2,95 m, mantendo pé-direito livre de 2,60 m nos ambientes.
+[F] Piso a piso – pavimento tipo = 2,95
 [F] Altura da edificação = 41,90
 [D] (Hidrossanitário) (Médio) Prumadas hidráulicas em shafts visitáveis junto às circulações, fora das unidades: facilita a manutenção e a medição individual.
 
@@ -189,9 +192,9 @@ ATA_04 = """Fachada e esquadrias, com a Envoltória.
 4. Varandas: a convenção já deve prever o envidraçamento, para não haver padrões diferentes na fachada.
 
 [D] (Arquitetura) (Alto) Fachada em porcelanato 60 × 120 ventilado (inserts metálicos) nas empenas e na fachada frontal; textura acrílica nas faces internas das varandas.
-[F] Fachada = Porcelanato 60 × 120 ventilado em todas as faces + textura acrílica nas varandas
+[F] Fachada = Porcelanato ventilado
 [D] (Arquitetura) (Médio) Esquadrias de alumínio linha 30 com pintura eletrostática grafite e vidro laminado 6 mm nas varandas.
-[F] Esquadrias = Alumínio linha 30, pintura grafite, vidro laminado 6 mm
+[F] Esquadrias = Alumínio
 [D] (Arquitetura) (Médio) Envidraçamento das varandas previsto na convenção do condomínio, com padrão único definido pela incorporadora.
 
 [P] Amostra física do porcelanato e mock-up da fixação para aprovação da Cambará."""
@@ -221,9 +224,9 @@ ATA_06 = """Revisão de custos (engenharia de valor), com a equipe de orçamento
 [D] (Orçamento) (Alto) Orçamento paramétrico do anteprojeto em R$ 41,2 milhões (CUB + 18% de itens fora do CUB), acima da meta de R$ 39 milhões.
 [F] Orçamento estimado = 41.200.000,00
 [D] (Hidrossanitário) (Alto) Revisão da {D:aquecimento_individual}: aquecimento central coletivo a gás com apoio solar e medição individual de água quente.
-[F] Aquecimento de água = Central coletivo a gás com apoio solar, medição individual
+[F] Aquecimento de água = Gás central coletivo
 [D] (Arquitetura) (Médio) Revisão da {D:fachada_ventilada}: porcelanato ventilado só na fachada frontal; empenas laterais em textura acrílica com frisos.
-[F] Fachada = Porcelanato 60 × 120 ventilado na fachada frontal + textura acrílica com frisos nas empenas
+[F] Fachada = Mista
 [D] (Orçamento) (Alto) Nova meta de orçamento depois da engenharia de valor: R$ 39,6 milhões.
 [F] Orçamento estimado = 39.600.000,00
 
@@ -263,7 +266,6 @@ ETAPAS = [
     {"tipo": "projeto", "quando": _d(2025, 8, 11, 9, 30), "autor": "demo.rafael"},
     {"tipo": "membros", "quando": _d(2025, 8, 11, 9, 40), "autor": "demo.rafael"},
     {"tipo": "ficha", "quando": _d(2025, 8, 12, 15, 10), "autor": "demo.rafael", "itens": FICHA_INICIAL},
-    {"tipo": "padrao", "quando": _d(2025, 8, 12, 15, 25), "autor": "demo.rafael", "dados": PADRAO_INICIAL},
     {"tipo": "documento", "quando": _d(2025, 8, 13, 11), "autor": "demo.bianca", "nome": "Layout",
      "situacao": "Recebido", "data_recebimento": date(2025, 8, 8),
      "observacao": "Programa de necessidades da Cambará (planilha rev. 02)"},
@@ -335,7 +337,7 @@ ETAPAS = [
      "checklist": [{"tarefa": "Relatório de sondagens R01 analisado", "feito": True},
                    {"tarefa": "Estimativa de cargas por pilar", "feito": True},
                    {"tarefa": "Consulta a 2 executoras sobre disponibilidade", "feito": False}],
-     "ficha": (O, "Fundações", "", "Estacas hélice contínua Ø50/Ø60 cm, L ≈ 16 m")},
+     "ficha": (SIS, "Fundações", "", "Estaca hélice contínua")},
     {"tipo": "resolver", "quando": _d(2025, 10, 16, 11, 30), "autor": "demo.tiago", "pendencia": "sondagens SPT",
      "decisao": "fundacoes", "observacao": "Sondagens recebidas em 10/10 e usadas na definição das fundações."},
 
@@ -347,7 +349,8 @@ ETAPAS = [
      "justificativa": "Solução conhecida pelas construtoras da região, com mão de obra disponível e "
                       "menor custo de fôrmas para a geometria do estudo preliminar.",
      "alternativa": "Alvenaria estrutural: descartada porque impede as opções de planta pedidas pelo comercial.",
-     "ficha": (O, "Sistema estrutural", "", "Concreto armado convencional, lajes maciças h = 12 cm")},
+     "ficha": [(SIS, "Sistema estrutural", "", "Concreto armado convencional"),
+               (SIS, "Tipo de laje", "", "Maciça")]},
 
     {"tipo": "cancelar", "quando": _d(2025, 10, 30, 9), "autor": "demo.rafael", "pendencia": "depósitos privativos",
      "motivo": "O comercial descartou os depósitos privativos; o espaço no subsolo 2 vira bicicletário."},
@@ -357,7 +360,6 @@ ETAPAS = [
      "autor": "demo.rafael", "titulo": "Compatibilização estrutural do anteprojeto",
      "participantes": _p(HELENA, RAFAEL, TIAGO, CAMILA), "texto": ATA_03,
      "chaves": ["estrutura_nervurada", "piso_a_piso", "shafts"],
-     "padrao": PADRAO_REVISADO,
      "pendencias": [{"pendencia": "Laudo cautelar", "categoria": "Fundações",
                      "responsavel": "Cambará (contratação)", "prazo": date(2026, 11, 13)}]},
     {"tipo": "adendo", "quando": _d(2025, 11, 20, 8, 45), "autor": "demo.rafael", "ata": 3,
@@ -389,7 +391,7 @@ ETAPAS = [
                   "individual de gás e chaminé coletiva por prumada.",
      "justificativa": "Padrão de mercado para o médio-alto e sem custo condominial de operação.",
      "alternativa": "Aquecimento elétrico de passagem: consumo alto e risco de sobrecarga na demanda.",
-     "ficha": (O, "Aquecimento de água", "", "Gás individual – aquecedor de passagem")},
+     "ficha": (SIS, "Aquecimento de água", "", "Gás individual")},
 
     {"tipo": "ata", "quando": _d(2026, 1, 27, 14), "fechamento": _d(2026, 1, 28, 11),
      "autor": "demo.bianca", "titulo": "Fachada e esquadrias",
