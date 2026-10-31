@@ -144,6 +144,9 @@ def excluir(s: Session, ator: Ator, projeto_id: int) -> List[str]:
 
     # A ordem importa por causa das chaves estrangeiras: primeiro quem aponta para
     # decisões/atas, depois as decisões, depois as atas e por fim o próprio projeto.
+    from nucleo.servicos.cronograma import excluir_do_projeto
+
+    excluir_do_projeto(s, projeto_id)  # antes das decisões (versões apontam para elas)
     for arquivo in arquivos_docs:  # antes dos documentos (chave estrangeira)
         s.delete(arquivo)
     s.flush()

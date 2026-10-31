@@ -253,6 +253,44 @@ ATA_08_RASCUNHO = """Compatibilização final do executivo (rascunho — ainda n
 [D] (HVAC) (Médio) Dutos de exaustão entre as nervuras: passagem dos dutos das churrasqueiras, com furação confirmada pela Calço.
 [P] Calço confirmar a furação das nervuras no térreo e no 1º tipo."""
 
+# ------------------------------------------------------------------ cronograma (3 versões)
+# (nome, tipo, início, entrega, depende da anterior, padrão). Marco: início = entrega.
+
+def _cron(*linhas):
+    return [{"nome": n, "tipo": t, "inicio": i, "entrega": e, "depende": dep, "padrao": pad}
+            for n, t, i, e, dep, pad in linhas]
+
+
+CRONOGRAMA_V1 = _cron(
+    ("Kick-off", "marco", date(2025, 8, 19), date(2025, 8, 19), False, True),
+    ("Estudo preliminar", "etapa", date(2025, 8, 20), date(2025, 10, 30), True, True),
+    ("Anteprojeto", "etapa", date(2025, 11, 3), date(2026, 1, 30), True, True),
+    ("Projeto básico", "etapa", date(2026, 2, 2), date(2026, 4, 30), True, True),
+    ("Aprovação na prefeitura", "etapa", date(2026, 2, 10), date(2026, 5, 15), False, False),
+    ("Projeto executivo", "etapa", date(2026, 5, 4), date(2026, 9, 30), True, True),
+    ("Liberado para obra", "marco", date(2026, 10, 15), date(2026, 10, 15), True, True),
+)
+# D-023: básico +30 dias (reanálise da prefeitura); executivo e liberação recalculados
+CRONOGRAMA_V2 = _cron(
+    ("Kick-off", "marco", date(2025, 8, 19), date(2025, 8, 19), False, True),
+    ("Estudo preliminar", "etapa", date(2025, 8, 20), date(2025, 10, 30), True, True),
+    ("Anteprojeto", "etapa", date(2025, 11, 3), date(2026, 1, 30), True, True),
+    ("Projeto básico", "etapa", date(2026, 2, 2), date(2026, 5, 30), True, True),
+    ("Aprovação na prefeitura", "etapa", date(2026, 2, 10), date(2026, 6, 16), False, False),
+    ("Projeto executivo", "etapa", date(2026, 6, 3), date(2026, 10, 30), True, True),
+    ("Liberado para obra", "marco", date(2026, 11, 14), date(2026, 11, 14), True, True),
+)
+# D-032: coberturas duplex, executivo +15 dias; liberação recalculada
+CRONOGRAMA_V3 = _cron(
+    ("Kick-off", "marco", date(2025, 8, 19), date(2025, 8, 19), False, True),
+    ("Estudo preliminar", "etapa", date(2025, 8, 20), date(2025, 10, 30), True, True),
+    ("Anteprojeto", "etapa", date(2025, 11, 3), date(2026, 1, 30), True, True),
+    ("Projeto básico", "etapa", date(2026, 2, 2), date(2026, 5, 30), True, True),
+    ("Aprovação na prefeitura", "etapa", date(2026, 2, 10), date(2026, 6, 16), False, False),
+    ("Projeto executivo", "etapa", date(2026, 6, 3), date(2026, 11, 14), True, True),
+    ("Liberado para obra", "marco", date(2026, 11, 29), date(2026, 11, 29), True, True),
+)
+
 # ------------------------------------------------------------------ etapas (ordem cronológica)
 # 'quando' é horário de Brasília. 'autor' é o username de quem executa a etapa.
 
@@ -286,6 +324,7 @@ ETAPAS = [
          {"pendencia": "sondagens SPT", "categoria": "Fundações", "responsavel": "Cambará (contratação)",
           "prazo": date(2025, 10, 10)},
      ]},
+    {"tipo": "cronograma", "quando": _d(2025, 8, 19, 18), "autor": "demo.rafael", "itens": CRONOGRAMA_V1},
 
     {"tipo": "decisao", "quando": _d(2025, 9, 2, 16, 40), "autor": "demo.helena", "chave": "sem_outorga",
      "titulo": "Projeto dentro do CA básico, sem outorga onerosa",
@@ -429,6 +468,8 @@ ETAPAS = [
      "chaves": ["recuo_subsolo", "vagas_pne", "prazo_extendido"],
      "pendencias": [{"pendencia": "Reapresentar o projeto legal", "categoria": "Urbanismo",
                      "responsavel": "Sérgio (Rito)", "prazo": date(2026, 4, 15)}]},
+    {"tipo": "revisao_cronograma", "quando": _d(2026, 3, 17, 18), "autor": "demo.rafael",
+     "decisao": "prazo_extendido", "itens": CRONOGRAMA_V2},
     {"tipo": "resolver", "quando": _d(2026, 4, 14, 15), "autor": "demo.rafael", "pendencia": "Reapresentar o projeto legal",
      "nova_decisao": {"chave": "reapresentacao",
                       "titulo": "Projeto legal reapresentado com as correções do comunique-se",
@@ -479,6 +520,8 @@ ETAPAS = [
      "chaves": ["coberturas", "reforco_laje"],
      "pendencias": [{"pendencia": "vagas cada cobertura", "categoria": "Arquitetura",
                      "responsavel": "Juliana (comercial Cambará)", "prazo": date(2026, 9, 15)}]},
+    {"tipo": "revisao_cronograma", "quando": _d(2026, 8, 26, 10), "autor": "demo.bianca",
+     "decisao": "coberturas", "itens": CRONOGRAMA_V3},
     {"tipo": "pendencia", "quando": _d(2026, 9, 1, 10), "autor": "demo.rafael",
      "titulo": "Aprovação do projeto de PPCI no Corpo de Bombeiros",
      "descricao": "Protocolar o PPCI com escada à prova de fumaça, hidrantes e sistema de alarme.",

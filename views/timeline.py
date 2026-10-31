@@ -23,6 +23,8 @@ from database import (
     Reuniao,
     adicionar_decisao,
     alteracoes_ficha_por_decisao,
+    versoes_cronograma_por_decisao,
+    cronograma_para_relatorio,
     alterar_propria_senha,
     anexo_pertence_ao_projeto,
     atualizar_projeto,
@@ -160,6 +162,7 @@ def build_timeline_view(
     on_open_plataforma=None,
     on_trocar_tema=None,
     on_open_painel=None,
+    on_open_cronograma=None,
 ):
     # O FilePicker é um "service" e pertence à View: é passado em ft.View(services=[...])
     # no return. NÃO use page.services aqui, pois ele exige que page.views não esteja vazia.
@@ -398,6 +401,7 @@ def build_timeline_view(
     rel_incluir_ficha = ft.Checkbox(label="Incluir a ficha do empreendimento", value=True)
     rel_incluir_documentos = ft.Checkbox(label="Incluir os documentos de referência (com datas de recebimento)",
                                          value=True)
+    rel_incluir_cronograma = ft.Checkbox(label="Incluir o cronograma (versão atual e revisões)", value=True)
     rel_incluir_detalhes = ft.Checkbox(
         label="Incluir justificativa, alternativas e checklist", value=True
     )
@@ -501,6 +505,7 @@ def build_timeline_view(
                 logo_empresa(projeto.organizacao_id),
                 logo_projeto(projeto.id),
                 listar_documentos_com_arquivos(projeto.id, usuario.id) if rel_incluir_documentos.value else None,
+                cronograma_para_relatorio(projeto.id) if rel_incluir_cronograma.value else None,
             )
         except Exception as erro:
             rel_mensagem.color = ft.Colors.ERROR
@@ -538,6 +543,7 @@ def build_timeline_view(
                     rel_categoria,
                     rel_incluir_ficha,
                     rel_incluir_documentos,
+                    rel_incluir_cronograma,
                     rel_incluir_detalhes,
                     rel_mensagem,
                     btn_baixar_relatorio,
@@ -1389,6 +1395,7 @@ def build_timeline_view(
 
         decisoes = buscar_decisoes_projeto(projeto.id, campo_busca.value or "")
         alteracoes_ficha = alteracoes_ficha_por_decisao(projeto.id)
+        versoes_cronograma = versoes_cronograma_por_decisao(projeto.id)
         reunioes = buscar_reunioes_projeto(projeto.id, campo_busca.value or "")
         if nivel < NIVEL_PAPEL["Editor"]:
             reunioes = [r for r in reunioes if r.status == "Fechada"]  # rascunho é só da equipe
@@ -1486,6 +1493,12 @@ def build_timeline_view(
                     )
                 )
 
+            area_cronograma = ft.Row(spacing=6, visible=decisao.id in versoes_cronograma, controls=[
+                ft.Icon(ft.Icons.EDIT_CALENDAR, size=16, color=tema.aviso(page)),
+                ft.Text(f"Impacta cronograma · Versão {versoes_cronograma.get(decisao.id)}",
+                        size=12, weight=ft.FontWeight.W_600, color=tema.aviso(page)),
+            ])
+
             timeline_list.controls.append(
                 ft.Row(
                     vertical_alignment=ft.CrossAxisAlignment.START,
@@ -1540,6 +1553,7 @@ def build_timeline_view(
                                         area_anexos,
                                         area_origem,
                                         area_ficha,
+                                        area_cronograma,
                                         ft.Divider(height=1),
                                         ft.Text(
                                             f"Autor: {decisao.autor} | Impacto: {decisao.impacto}",
@@ -1562,6 +1576,10 @@ def build_timeline_view(
     async def abrir_ficha_empreendimento(_):
         if on_open_ficha:
             await on_open_ficha()
+
+    async def abrir_cronograma(_):
+        if on_open_cronograma:
+            await on_open_cronograma()
 
     async def abrir_pendencias(_):
         if on_open_pendencias:
@@ -1613,6 +1631,7 @@ def build_timeline_view(
         page.show_dialog(modal_projeto)
 
     btn_ficha = _item(ft.Icons.ASSIGNMENT, "Ficha do Empreendimento", abrir_ficha_empreendimento)
+    btn_cronograma = _item(ft.Icons.EDIT_CALENDAR, "Cronograma", abrir_cronograma)
     btn_relatorio = _item(ft.Icons.PICTURE_AS_PDF, "Relatório PDF", abrir_relatorio)
     btn_novo_projeto = _item(ft.Icons.CREATE_NEW_FOLDER_OUTLINED, "Novo projeto", _abrir_novo_projeto)
     btn_editar_projeto = _item(ft.Icons.EDIT_OUTLINED, "Editar projeto", abrir_edicao_projeto)
@@ -1686,6 +1705,7 @@ def build_timeline_view(
             _secao("PROJETO"),
             btn_pendencias,
             btn_ficha,
+            btn_cronograma,
             btn_relatorio,
             secao_gestao,
             btn_novo_projeto,

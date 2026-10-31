@@ -15,7 +15,8 @@ from sqlalchemy import text
 from api import erros
 from api.configuracao import PREFIXO, VERSAO, configuracao
 from api.deps import Sessao
-from api.rotas import admin, arquivos, atas, auth, decisoes, documentos, ficha, organizacoes, pendencias, projetos
+from api.rotas import (admin, arquivos, atas, auth, cronograma, decisoes, documentos, ficha, organizacoes,
+                       pendencias, projetos)
 from config import garantir_pastas
 from models import CAMPOS_LONGOS, CATEGORIAS, FICHA_GRUPOS, IMPACTOS, PAPEIS
 from nucleo.db import aguardar_banco
@@ -63,7 +64,8 @@ def criar_app() -> FastAPI:
         return resposta
 
     erros.registrar(app)
-    for modulo in (auth, organizacoes, projetos, decisoes, atas, pendencias, ficha, documentos, admin, arquivos):
+    for modulo in (auth, organizacoes, projetos, decisoes, atas, pendencias, ficha, cronograma, documentos, admin,
+                   arquivos):
         app.include_router(modulo.rotas, prefix=PREFIXO)
     app.include_router(organizacoes.plataforma, prefix=PREFIXO)
 

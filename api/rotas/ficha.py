@@ -42,7 +42,8 @@ def relatorio_decisoes(projeto_id: int, ator: AtorAtual, s: Sessao,
                        de: Optional[datetime.date] = None, ate: Optional[datetime.date] = None,
                        categoria: Optional[Categoria] = None,
                        incluir_ficha: bool = True, incluir_detalhes: bool = True,
-                       incluir_documentos: bool = True):
+                       incluir_documentos: bool = True, incluir_cronograma: bool = True):
     nome, conteudo, _ = relatorios.relatorio_decisoes(s, ator, projeto_id, de, ate, categoria,
-                                                      incluir_ficha, incluir_detalhes, incluir_documentos)
+                                                      incluir_ficha, incluir_detalhes, incluir_documentos,
+                                                      incluir_cronograma)
     return resposta_pdf(nome, conteudo)

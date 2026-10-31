@@ -260,3 +260,27 @@ def test_documentos_de_referencia(cliente, equipe):
     assert cliente.get(f"{V}/projetos/{pid}/documentos/resumo", headers=cli).json() == {
         "recebidos": 2, "pendentes": 5, "nao_aplicaveis": 0, "total": 7, "aplicaveis": 7}
     assert cliente.get(f"{V}/projetos/{pid}/documentos", headers=equipe["ze"]).status_code == 404
+
+
+def test_cronograma_pela_api(cliente, equipe):
+    pid = equipe["pid"]
+    itens = [{"nome": "Kick-off", "tipo": "marco", "inicio": "2025-08-19", "depende_da_anterior": False, "padrao": True},
+             {"nome": "Anteprojeto", "inicio": "2025-09-01", "entrega": "2025-12-15", "padrao": True},
+             {"nome": "Liberado para obra", "tipo": "marco", "inicio": "2026-02-01", "padrao": True}]
+    assert cliente.post(f"{V}/projetos/{pid}/cronograma", json={"itens": itens}, headers=equipe["cli"]).status_code == 403
+    r = cliente.post(f"{V}/projetos/{pid}/cronograma", json={"itens": itens}, headers=equipe["bia"])
+    assert r.status_code == 201 and r.json()["versao"]["numero"] == 1
+    itens[1]["entrega"], itens[2]["inicio"] = "2026-01-14", "2026-03-03"  # +30 dias
+    sem_decisao = cliente.post(f"{V}/projetos/{pid}/cronograma/revisoes", json={"itens": itens}, headers=equipe["bia"])
+    assert sem_decisao.status_code in (400, 422)
+    r = cliente.post(f"{V}/projetos/{pid}/cronograma/revisoes", headers=equipe["bia"], json={
+        "itens": itens, "nova_decisao": {"titulo": "Anteprojeto estendido", "impacto": "Alto"}})
+    assert r.status_code == 201, r.text
+    dados = cliente.get(f"{V}/projetos/{pid}/cronograma", headers=equipe["cli"]).json()
+    assert dados["versao"]["numero"] == 2 and dados["versao"]["decisao_id"]
+    assert {i["nome"]: i["desvio_entrega_dias"] for i in dados["itens"]}["Liberado para obra"] == 30
+    v1 = cliente.get(f"{V}/projetos/{pid}/cronograma?versao=1", headers=equipe["cli"]).json()
+    assert v1["itens"][-1]["entrega"] == "2026-02-01"
+    assert cliente.get(f"{V}/projetos/{pid}/cronograma", headers=equipe["ze"]).status_code == 404
+    pdf = cliente.get(f"{V}/projetos/{pid}/relatorios/decisoes.pdf", headers=equipe["cli"])
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")

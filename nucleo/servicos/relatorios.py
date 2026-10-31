@@ -13,6 +13,7 @@ from config import NOME_APP
 from nucleo.ator import Ator
 from nucleo.permissoes import LEITOR, exigir
 from nucleo.servicos import atas as servico_atas
+from nucleo.servicos import cronograma as servico_cronograma
 from nucleo.servicos import decisoes as servico_decisoes
 from nucleo.servicos import documentos as servico_documentos
 from nucleo.servicos import ficha as servico_ficha
@@ -39,7 +40,7 @@ def relatorio_decisoes(
     s: Session, ator: Ator, projeto_id: int,
     de: Optional[datetime.date] = None, ate: Optional[datetime.date] = None,
     categoria: Optional[str] = None, incluir_ficha: bool = True, incluir_detalhes: bool = True,
-    incluir_documentos: bool = True,
+    incluir_documentos: bool = True, incluir_cronograma: bool = True,
 ) -> Tuple[str, bytes, int]:
     """Devolve (nome do arquivo, conteúdo do PDF, quantidade de decisões)."""
     exigir(s, ator, projeto_id, LEITOR)
@@ -63,6 +64,7 @@ def relatorio_decisoes(
             ator.nome, texto_dos_filtros(de, ate, categoria),
             incluir_ficha, incluir_detalhes, NOME_APP, None, logo_empresa, logo_cliente,
             documentos=servico_documentos.consultar_com_arquivos(s, projeto_id) if incluir_documentos else None,
+            cronograma=servico_cronograma.para_relatorio(s, projeto_id) if incluir_cronograma else None,
         )
         return nome, destino.read_bytes(), total
 

@@ -67,3 +67,17 @@ def test_demo_usa_os_sistemas_construtivos_da_ficha(demo):
             if h.nome == "Tipo de laje"]
     assert ("Maciça", "Nervurada", "Decisão D-010 · Ata 03") in laje
     assert (None, "Maciça", "Decisão D-009") in laje
+
+
+def test_demo_tem_cronograma_com_tres_versoes(demo):
+    from nucleo.ator import Ator
+    from nucleo.servicos import cronograma
+
+    helena, marcos, projeto = demo
+    with nova_sessao() as s:
+        dados = cronograma.obter(s, Ator.de_usuario(marcos), projeto.id)
+        selos = cronograma.versoes_por_decisao(s, projeto.id)
+    assert [v.numero for v in dados["versoes"]] == [1, 2, 3]
+    assert dados["itens"][-1].nome == "Liberado para obra" and str(dados["itens"][-1].entrega) == "2026-11-29"
+    numeros = {d.id: d.numero for d in db.listar_decisoes_projeto(projeto.id)}
+    assert sorted(numeros[i] for i in selos) == [23, 32]

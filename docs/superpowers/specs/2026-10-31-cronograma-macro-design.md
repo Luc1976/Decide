@@ -1,6 +1,6 @@
 # Cronograma macro do projeto — desenho
 
-Data: 31/10/2026 · Branch: `homologacao` · Situação: aguardando revisão do Lucas
+Data: 31/10/2026 · Branch: `homologacao` · Situação: aprovado em 31/10 e implementado
 
 ## 1. Objetivo
 

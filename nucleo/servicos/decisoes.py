@@ -112,9 +112,10 @@ def obter(s: Session, ator: Ator, projeto_id: int, decisao_id: int) -> Decisao:
     return decisao
 
 
-def criar(s: Session, ator: Ator, projeto_id: int, dados: DadosDecisao,
-          verificar_anexos: bool = True) -> Decisao:
-    """Registra a decisão. Se 'alteracao_ficha' vier preenchida, a ficha é atualizada na
+def criar_sem_gravar(s: Session, ator: Ator, projeto_id: int, dados: DadosDecisao,
+                     verificar_anexos: bool = True) -> Decisao:
+    """Prepara a decisão na sessão SEM commit (para compor com outra gravação, como a
+    revisão do cronograma). Se 'alteracao_ficha' vier preenchida, a ficha é atualizada na
     mesma transação, ligada a esta decisão.
 
     verificar_anexos=False só para o app Flet legado, cujos anexos já estão gravados em
@@ -147,6 +148,13 @@ def criar(s: Session, ator: Ator, projeto_id: int, dados: DadosDecisao,
         servico_ficha.aplicar(s, projeto_id, [dados.alteracao_ficha], ator.nome, decisao_id=decisao.id)
     auditoria.registrar(s, ator, "decisao.criar", projeto_id, "decisao", decisao.id,
                         {"numero": decisao.numero, "titulo": decisao.titulo})
+    return decisao
+
+
+def criar(s: Session, ator: Ator, projeto_id: int, dados: DadosDecisao,
+          verificar_anexos: bool = True) -> Decisao:
+    """Registra a decisão e grava (commit). Ver criar_sem_gravar."""
+    decisao = criar_sem_gravar(s, ator, projeto_id, dados, verificar_anexos)
     s.commit()
     s.refresh(decisao)
     return decisao
