@@ -2,8 +2,11 @@ import os
 
 import flet as ft
 
+import flet_ajustes
 from app import main
 from config import ASSETS_DIR, DATA_DIR, MODO_WEB, PORTA, UPLOAD_DIR, verificar_gravacao
+
+flet_ajustes.aplicar()  # resposta atrasada do navegador (iPhone) não derruba mais a conexão
 
 _erro_pasta = verificar_gravacao()
 if _erro_pasta:

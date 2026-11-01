@@ -1743,7 +1743,10 @@ def build_timeline_view(
     )
 
     async def abrir_menu(_):
-        await tela["view"].show_drawer()
+        try:
+            await tela["view"].show_drawer()
+        except Exception:  # navegador não respondeu (conexão caindo no celular): o próximo toque tenta de novo
+            pass
 
     barra = ft.AppBar(
         leading=ft.IconButton(icon=ft.Icons.MENU, tooltip="Menu", on_click=abrir_menu),
