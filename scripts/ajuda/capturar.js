@@ -92,6 +92,9 @@ const PASSOS = [
   ['12-documentos', async (p) => { await rota(p, '/documentos'); }],
   ['13-relatorio', async (p) => { await rota(p, '/timeline'); await clicar(p, 28, 32); await clicar(p, 150, 410, 3000); }],
   ['14-membros', async (p) => { await fechar(p); await clicar(p, 28, 32); await clicar(p, 150, 604, 3000); }],
+  ['17-novo-projeto', async (p) => { await fechar(p); await clicar(p, 28, 32); await clicar(p, 150, 500, 3000); }],
+  ['18-editar-projeto', async (p) => { await fechar(p); await clicar(p, 28, 32); await clicar(p, 150, 552, 3000); }],
+  ['19-projetos-arquivados', async (p) => { await fechar(p); await clicar(p, 28, 32); await clicar(p, 150, 708, 3000); }],
 ];
 
 (async () => {

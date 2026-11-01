@@ -301,6 +301,10 @@ def _d(ano, mes, dia, hora=10, minuto=0):
 
 ETAPAS = [
     # ---------------- Estudo preliminar (ago–out/2025)
+    {"tipo": "projeto_arquivado", "quando": _d(2025, 8, 4, 18), "autor": "demo.rafael",
+     "nome": "Edifício Corporativo Jacarandá", "cliente": PROJETO_CLIENTE,
+     "descricao": "Sede corporativa de 8 pavimentos, entregue em 2024. Projeto concluído e arquivado.",
+     "criado_em": _d(2022, 3, 14, 9)},
     {"tipo": "projeto", "quando": _d(2025, 8, 11, 9, 30), "autor": "demo.rafael"},
     {"tipo": "membros", "quando": _d(2025, 8, 11, 9, 40), "autor": "demo.rafael"},
     {"tipo": "ficha", "quando": _d(2025, 8, 12, 15, 10), "autor": "demo.rafael", "itens": FICHA_INICIAL},

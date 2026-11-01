@@ -301,11 +301,114 @@ def _secao_documentos(documentos, estilos, com_titulo: bool = True):
     return elementos
 
 
+GANTT_ETAPA = colors.HexColor("#1F3A5F")
+GANTT_ATRASO = colors.HexColor("#C2410C")
+GANTT_REFERENCIA = colors.HexColor("#B8C2CC")
+GANTT_GRADE = colors.HexColor("#E2E7ED")
+GANTT_HOJE = colors.HexColor("#C62828")
+
+
+def desenho_gantt(atual, referencia, largura=17 * cm, hoje=None):
+    """Gantt em vetor (reportlab.graphics) com o mesmo visual da tela do cronograma:
+    etapas em barras (laranja quando a entrega passou da referência), marcos em losango,
+    a referência em cinza sob cada item, escala de meses e a linha de hoje.
+    atual / referencia: listas de cronograma_calculos.Item (referência vazia = versão 1)."""
+    import datetime as _dt
+
+    from reportlab.graphics.shapes import Drawing, Line, Polygon, Rect, String
+
+    import cronograma_calculos as calc
+
+    hoje = hoje or _dt.date.today()
+    inicio, fim, meses = calc.escala(atual, referencia)
+    col_nomes = 4.6 * cm
+    graf = largura - col_nomes
+    linha = 0.62 * cm
+    topo = 0.55 * cm
+    rodape = 0.65 * cm
+    altura = topo + len(atual) * linha + rodape
+    desenho = Drawing(largura, altura)
+    base_grade = rodape
+    teto = altura - topo
+
+    def x(dia):
+        return col_nomes + calc.posicao(dia, inicio, fim) * graf
+
+    passo = 1 if len(meses) <= 18 else (2 if len(meses) <= 36 else 3)
+    for i, mes in enumerate(meses):
+        desenho.add(Line(x(mes), base_grade, x(mes), teto, strokeColor=GANTT_GRADE, strokeWidth=0.4))
+        if i % passo == 0:
+            desenho.add(String(x(mes) + 1.5, teto + 0.18 * cm, mes.strftime("%m/%y"),
+                               fontName="Helvetica", fontSize=6.5, fillColor=CINZA))
+
+    ref = {calc.chave(i.nome): calc.normalizar_item(i) for i in referencia}
+    desvios, _ = calc.desvios(atual, referencia) if referencia else ({}, [])
+
+    def losango(cx, cy, r, cor, contorno=False):
+        forma = Polygon([cx, cy + r, cx + r, cy, cx, cy - r, cx - r, cy],
+                        fillColor=None if contorno else cor, strokeColor=cor, strokeWidth=0.8 if contorno else 0)
+        return forma
+
+    for indice, item in enumerate(atual):
+        item = calc.normalizar_item(item)
+        y = teto - (indice + 1) * linha  # base da linha
+        nome = item.nome if len(item.nome) <= 34 else item.nome[:33].rstrip() + "…"
+        desenho.add(String(0.1 * cm, y + 0.24 * cm, nome, fontName="Helvetica", fontSize=7.5, fillColor=AZUL))
+        r = ref.get(calc.chave(item.nome))
+        if r is not None and r.inicio:
+            if r.tipo == "marco":
+                desenho.add(losango(x(r.inicio), y + 0.12 * cm, 0.09 * cm, GANTT_REFERENCIA, contorno=True))
+            else:
+                barra_ref = Rect(x(r.inicio), y + 0.07 * cm, max(x(r.entrega) - x(r.inicio), 1.5), 0.1 * cm,
+                                 fillColor=GANTT_REFERENCIA, strokeColor=None)
+                barra_ref._papel = "referencia"
+                desenho.add(barra_ref)
+        d = desvios.get(calc.chave(item.nome))
+        atrasada = d is not None and not d.novo and d.entrega_dias > 0
+        cor = GANTT_ATRASO if atrasada else GANTT_ETAPA
+        if item.tipo == "marco":
+            marca = losango(x(item.inicio), y + 0.34 * cm, 0.15 * cm, cor)
+            marca._papel = "marco"
+            desenho.add(marca)
+        else:
+            barra = Rect(x(item.inicio), y + 0.2 * cm, max(x(item.entrega) - x(item.inicio), 2), 0.26 * cm,
+                         rx=1.2, ry=1.2, fillColor=cor, strokeColor=None)
+            barra._papel = "etapa"
+            barra._atrasada = atrasada
+            desenho.add(barra)
+
+    if inicio <= hoje <= fim:
+        desenho.add(Line(x(hoje), base_grade, x(hoje), teto, strokeColor=GANTT_HOJE, strokeWidth=1))
+
+    # legenda
+    lx, ly = 0.1 * cm, 0.12 * cm
+    itens_legenda = [("barra", GANTT_ETAPA, "Etapa"), ("losango", GANTT_ETAPA, "Marco")]
+    if referencia:
+        itens_legenda += [("ref", GANTT_REFERENCIA, "Referência (versão 1)"),
+                          ("barra", GANTT_ATRASO, "Entrega depois da referência")]
+    itens_legenda.append(("hoje", GANTT_HOJE, "Hoje"))
+    for tipo, cor, texto in itens_legenda:
+        if tipo == "barra":
+            desenho.add(Rect(lx, ly + 0.03 * cm, 0.5 * cm, 0.2 * cm, fillColor=cor, strokeColor=None))
+        elif tipo == "ref":
+            desenho.add(Rect(lx, ly + 0.08 * cm, 0.5 * cm, 0.08 * cm, fillColor=cor, strokeColor=None))
+        elif tipo == "losango":
+            desenho.add(losango(lx + 0.25 * cm, ly + 0.13 * cm, 0.12 * cm, cor))
+        else:
+            desenho.add(Line(lx + 0.25 * cm, ly - 0.02 * cm, lx + 0.25 * cm, ly + 0.3 * cm, strokeColor=cor,
+                             strokeWidth=1))
+        desenho.add(String(lx + 0.6 * cm, ly + 0.05 * cm, texto, fontName="Helvetica", fontSize=6.8, fillColor=CINZA))
+        lx += 0.9 * cm + len(texto) * 0.13 * cm
+    return desenho
+
+
 def _secao_cronograma(dados, estilos):
-    """Tabela da versão atual (início, entrega, desvio em relação à versão 1) e as versões."""
+    """Gantt, tabela da versão atual (início, entrega, desvio em relação à versão 1) e as versões."""
     import cronograma_calculos as calc
 
     elementos = _titulo_secao(f"Cronograma (versão {dados['numero']})", estilos, 5 * cm)
+    elementos.append(desenho_gantt(dados["atual"], dados["v1"] if dados["numero"] > 1 else []))
+    elementos.append(Spacer(1, 8))
     desvios, removidos = calc.desvios(dados["atual"], dados["v1"]) if dados["numero"] > 1 else ({}, [])
     cabecalho = [Paragraph(f'<font color="#FFFFFF"><b>{t}</b></font>', estilos["rotulo"])
                  for t in ("Etapa / marco", "Início", "Entrega", "Desvio da entrega (vs. versão 1)")]
