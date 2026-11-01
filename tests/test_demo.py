@@ -81,3 +81,18 @@ def test_demo_tem_cronograma_com_tres_versoes(demo):
     assert dados["itens"][-1].nome == "Liberado para obra" and str(dados["itens"][-1].entrega) == "2026-11-29"
     numeros = {d.id: d.numero for d in db.listar_decisoes_projeto(projeto.id)}
     assert sorted(numeros[i] for i in selos) == [23, 32]
+
+
+def test_demo_tem_um_projeto_arquivado(demo):
+    helena, _, projeto = demo
+    arquivados = db.listar_projetos_arquivados(helena.id)
+    assert [p.nome for p in arquivados] == ["Edifício Corporativo Jacarandá"]
+    assert projeto.nome in [p.nome for p in db.listar_projetos_do_usuario(helena.id)]
+
+
+def test_responsavel_ve_o_projeto_arquivado(demo):
+    from nucleo.servicos.usuarios import buscar_por_username
+
+    with nova_sessao() as s:
+        rafael = buscar_por_username(s, "demo.rafael")
+    assert [p.nome for p in db.listar_projetos_arquivados(rafael.id)] == ["Edifício Corporativo Jacarandá"]

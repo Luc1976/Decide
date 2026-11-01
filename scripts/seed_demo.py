@@ -172,6 +172,12 @@ class Carga:
         if tipo == "projeto":
             p = s_projetos.criar(s, ator, D.PROJETO_NOME, D.PROJETO_CLIENTE, D.PROJETO_DESCRICAO)
             self.pid = p.id
+        elif tipo == "projeto_arquivado":
+            # projeto concluído e arquivado: aparece em "Projetos arquivados" (capturas da ajuda)
+            outro = s_projetos.criar(s, ator, e["nome"], e["cliente"], e.get("descricao"))
+            s_projetos.arquivar(s, ator, outro.id, True)
+            s.exec(update(Projeto).where(Projeto.id == outro.id).values(data_criacao=_utc(e["criado_em"])))
+            s.commit()
         elif tipo == "membros":
             for u in D.USUARIOS:
                 if u["papel"] and u["username"] != D.CRIADOR:

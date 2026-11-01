@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ajuda do Decidiu</title>
+<meta name="description" content="Como usar o Decidiu: linha do tempo, decisões, atas, pendências, ficha do empreendimento, cronograma e relatórios.">
+<link rel="icon" href="/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --azul: #0F2232;
+    --azul-2: #1B3A52;
+    --papel: #F5F7FA;
+    --folha: #FFFFFF;
+    --texto: #1E2B37;
+    --suave: #5A6878;
+    --cota: #C9D3DD;
+    --laranja: #E8742A;
+    --laranja-texto: #B4510F;
+    --marca-d: #E3EEFF;
+    --marca-f: #DCF5E7;
+    --marca-p: #FFF1C9;
+    --foco: #E8742A;
+    --lateral: 288px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --papel: #0E1A25;
+      --folha: #142433;
+      --texto: #E3E9EF;
+      --suave: #9FB0C0;
+      --cota: #2C4256;
+      --laranja-texto: #F29A5E;
+      --marca-d: #1D3557;
+      --marca-f: #17402F;
+      --marca-p: #4A3B12;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--papel);
+    color: var(--texto);
+    font: 400 1.0625rem/1.6 "Source Sans 3", system-ui, sans-serif;
+  }
+  a { color: var(--azul-2); }
+  @media (prefers-color-scheme: dark) { a { color: #8EC1EA; } }
+  :focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; }
+
+  /* ---------- índice lateral ---------- */
+  .lateral {
+    position: fixed; inset: 0 auto 0 0; width: var(--lateral);
+    background: var(--azul); color: #DCE5EE;
+    display: flex; flex-direction: column; padding: 22px 18px 18px;
+    overflow-y: auto;
+  }
+  .marca { display: flex; align-items: center; gap: 12px; text-decoration: none; color: #fff; }
+  .marca img { width: 44px; height: 44px; border-radius: 10px; background: #fff; }
+  .marca strong { font: 700 1.15rem/1.1 Montserrat, sans-serif; display: block; }
+  .marca span { font-size: .85rem; color: #A9B9C8; }
+  .busca { margin: 20px 0 14px; }
+  .busca label { display: block; font-size: .85rem; color: #A9B9C8; margin-bottom: 4px; }
+  .busca input {
+    width: 100%; padding: 9px 11px; border-radius: 8px; border: 1px solid #36506A;
+    background: #0A1824; color: #fff; font: inherit; font-size: .95rem;
+  }
+  .busca input::placeholder { color: #7D93A8; }
+  .indice { list-style: none; margin: 0; padding: 0; }
+  .indice a {
+    display: grid; grid-template-columns: 2.2rem 1fr; align-items: baseline;
+    padding: 6px 8px; border-radius: 6px; color: #DCE5EE; text-decoration: none; font-size: .98rem;
+  }
+  .indice a span { font: 600 .78rem Montserrat, sans-serif; color: #7D93A8; }
+  .indice a:hover { background: #18334A; }
+  .indice a[aria-current="true"] { background: #18334A; color: #fff; }
+  .indice a[aria-current="true"] span { color: var(--laranja); }
+  .indice li.oculto { display: none; }
+  .rodape-lateral { margin-top: auto; padding-top: 18px; font-size: .85rem; color: #A9B9C8; }
+  .rodape-lateral a { color: #fff; }
+
+  /* ---------- conteúdo ---------- */
+  main { margin-left: var(--lateral); padding: 48px clamp(20px, 5vw, 72px) 96px; }
+  .abertura { max-width: 980px; margin-bottom: 56px; }
+  .abertura h1 {
+    font: 700 clamp(2rem, 4vw, 2.9rem)/1.1 Montserrat, sans-serif; color: var(--azul);
+    margin: 0 0 14px; letter-spacing: -0.01em;
+  }
+  @media (prefers-color-scheme: dark) { .abertura h1, h2, h3 { color: #F2F6FA !important; } }
+  .abertura p { max-width: 64ch; margin: 0 0 22px; font-size: 1.15rem; color: var(--suave); }
+  .primeiros {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0;
+    border-top: 2px solid var(--azul); margin: 0; padding: 0; list-style: none; counter-reset: passo;
+  }
+  .primeiros li { padding: 14px 16px 6px 0; counter-increment: passo; font-size: .98rem; }
+  .primeiros li::before {
+    content: counter(passo); display: block; font: 700 1.5rem Montserrat, sans-serif; color: var(--laranja);
+  }
+  .primeiros b { display: block; color: var(--azul); }
+  @media (prefers-color-scheme: dark) { .primeiros b { color: #fff; } .primeiros { border-color: var(--cota); } }
+
+  section.folha {
+    max-width: 980px; padding: 40px 0 8px; border-top: 1px solid var(--cota);
+  }
+  .numero-folha { font: 600 .85rem Montserrat, sans-serif; color: var(--laranja-texto); margin: 0 0 4px; }
+  h2 { font: 700 1.75rem/1.2 Montserrat, sans-serif; color: var(--azul); margin: 0 0 12px; }
+  h3 { font: 700 1.12rem/1.3 Montserrat, sans-serif; color: var(--azul); margin: 28px 0 8px; }
+  .texto { max-width: 72ch; }
+  .texto p { margin: 0 0 14px; }
+  ol.passos { margin: 0 0 18px; padding: 0; list-style: none; counter-reset: p; max-width: 72ch; }
+  ol.passos > li { position: relative; padding: 0 0 10px 2.4rem; counter-increment: p; }
+  ol.passos > li::before {
+    content: counter(p); position: absolute; left: 0; top: .1rem; width: 1.6rem; height: 1.6rem;
+    border-radius: 50%; border: 2px solid var(--laranja); color: var(--laranja-texto);
+    font: 700 .85rem/1.45rem Montserrat, sans-serif; text-align: center;
+  }
+  ul.lista { max-width: 72ch; padding-left: 1.2rem; margin: 0 0 16px; }
+  ul.lista li { margin-bottom: 6px; }
+  .botao {
+    font-weight: 600; white-space: nowrap; padding: 0 .35em; border-radius: 4px;
+    background: color-mix(in srgb, var(--cota) 45%, transparent);
+  }
+  code, .marcacao {
+    font: .92rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .exemplo-ata {
+    max-width: 72ch; margin: 6px 0 18px; padding: 0; list-style: none;
+    border-left: 3px solid var(--cota);
+  }
+  .exemplo-ata li { padding: 6px 12px; margin: 0 0 4px; border-radius: 0 6px 6px 0; }
+  .exemplo-ata .d { background: var(--marca-d); }
+  .exemplo-ata .f { background: var(--marca-f); }
+  .exemplo-ata .p { background: var(--marca-p); }
+  .exemplo-ata small { display: block; font-family: "Source Sans 3", sans-serif; color: var(--suave); font-size: .85rem; }
+
+  figure { margin: 18px 0 26px; }
+  figure a { display: block; }
+  figure img {
+    display: block; width: 100%; height: auto; border: 1px solid var(--cota);
+    border-radius: 6px; background: #fff;
+  }
+  figure.estreita img { max-width: 360px; }
+  figcaption { margin-top: 8px; font-size: .92rem; color: var(--suave); max-width: 72ch; }
+  figcaption b { color: var(--texto); }
+
+  .nota {
+    max-width: 72ch; margin: 0 0 18px; padding: 10px 14px;
+    border-left: 4px solid var(--laranja); background: var(--folha);
+  }
+  .nota b { color: var(--laranja-texto); }
+
+  table.papeis { border-collapse: collapse; width: 100%; max-width: 860px; margin: 8px 0 22px; font-size: .98rem; }
+  .papeis th, .papeis td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--cota); vertical-align: top; }
+  .papeis th { font: 700 .9rem Montserrat, sans-serif; color: var(--azul); background: var(--folha); }
+  @media (prefers-color-scheme: dark) { .papeis th { color: #fff; } }
+  .papeis td:first-child { font-weight: 600; white-space: nowrap; }
+
+  details.pergunta { max-width: 72ch; border-bottom: 1px solid var(--cota); padding: 10px 0; }
+  details.pergunta summary { cursor: pointer; font-weight: 600; }
+  details.pergunta p { margin: 8px 0 4px; }
+
+  .sem-resultado { display: none; max-width: 72ch; padding: 18px 0; color: var(--suave); }
+  section.folha.oculta { display: none; }
+
+  /* ---------- celular ---------- */
+  .topo-celular { display: none; }
+  @media (max-width: 900px) {
+    .lateral { position: static; width: auto; padding: 14px 16px; }
+    .lateral .navegacao { display: none; }
+    .lateral.aberta .navegacao { display: block; }
+    .topo-celular { display: flex; justify-content: space-between; align-items: center; }
+    .topo-celular button {
+      font: 600 .95rem "Source Sans 3", sans-serif; color: #fff; background: #18334A;
+      border: 1px solid #36506A; border-radius: 8px; padding: 8px 12px;
+    }
+    .lateral > .marca { display: none; }
+    .rodape-lateral { display: none; }
+    main { margin-left: 0; padding: 28px 16px 72px; }
+    .primeiros { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    figure.estreita img { max-width: 100%; }
+  }
+  @media (max-width: 480px) { .primeiros { grid-template-columns: 1fr; } }
+  @media print {
+    .lateral { display: none; }
+    main { margin: 0; padding: 0; }
+    section.folha { break-inside: avoid-page; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="lateral" id="lateral" aria-label="Índice da ajuda">
+  <div class="topo-celular">
+    <a class="marca" href="/"><img src="/icon.png" alt="Logo do Decidiu"><span><strong>Ajuda do Decidiu</strong></span></a>
+    <button type="button" id="abrir-indice" aria-expanded="false" aria-controls="navegacao">Índice</button>
+  </div>
+  <a class="marca" href="/">
+    <img src="/icon.png" alt="Logo do Decidiu">
+    <span><strong>Decidiu</strong><span>Ajuda</span></span>
+  </a>
+  <div class="navegacao" id="navegacao">
+    <div class="busca">
+      <label for="campo-busca">Procurar na ajuda</label>
+      <input id="campo-busca" type="search" placeholder="Ex.: adendo, tipologia, PDF" autocomplete="off">
+    </div>
+    <ol class="indice" id="indice">
+      <li><a href="#primeiro-acesso"><span>01</span>Primeiro acesso</a></li>
+      <li><a href="#perfis"><span>02</span>Equipe e cliente</a></li>
+      <li><a href="#projetos"><span>03</span>Projetos</a></li>
+      <li><a href="#linha-do-tempo"><span>04</span>Linha do tempo</a></li>
+      <li><a href="#decisoes"><span>05</span>Registrar uma decisão</a></li>
+      <li><a href="#atas"><span>06</span>Atas de reunião</a></li>
+      <li><a href="#pendencias"><span>07</span>Pendências</a></li>
+      <li><a href="#ficha"><span>08</span>Ficha do empreendimento</a></li>
+      <li><a href="#cronograma"><span>09</span>Cronograma</a></li>
+      <li><a href="#documentos"><span>10</span>Documentos de referência</a></li>
+      <li><a href="#relatorio"><span>11</span>Relatório em PDF</a></li>
+      <li><a href="#membros"><span>12</span>Membros e acessos</a></li>
+      <li><a href="#celular"><span>13</span>No celular</a></li>
+      <li><a href="#perguntas"><span>14</span>Perguntas frequentes</a></li>
+    </ol>
+  </div>
+  <p class="rodape-lateral"><a href="/">Voltar ao Decidiu</a></p>
+</nav>
+
+<main id="conteudo">
+  <header class="abertura">
+    <h1>Como usar o Decidiu</h1>
+    <p>O Decidiu guarda a memória do projeto: cada decisão com o motivo, a reunião em que nasceu
+      e o que ela mudou na ficha e no cronograma. Esta ajuda mostra cada tela com um projeto de
+      exemplo, o Residencial Alto das Quaresmeiras.</p>
+    <ol class="primeiros">
+      <li><b>Entre</b>com seu usuário e escolha o projeto no menu.</li>
+      <li><b>Registre</b>as decisões, direto ou pela ata da reunião.</li>
+      <li><b>Acompanhe</b>a ficha, as pendências e o cronograma.</li>
+      <li><b>Compartilhe</b>o relatório em PDF com o cliente.</li>
+    </ol>
+  </header>
+
+  <p class="sem-resultado" id="sem-resultado">Nada encontrado. Tente outra palavra, como “ata”, “ficha” ou “cronograma”.</p>
+
+  <section class="folha" id="primeiro-acesso">
+    <p class="numero-folha">Folha 01</p>
+    <h2>Primeiro acesso</h2>
+    <div class="texto">
+      <p>Entre com o usuário (ou e-mail) e a senha que o administrador do seu escritório cadastrou.
+        Marque <span class="botao">Salvar meu usuário neste aparelho</span> para não digitar o usuário de novo.</p>
+      <p>Esqueceu a senha? Use <span class="botao">Esqueci minha senha</span>: o Decidiu envia um link para o
+        e-mail cadastrado. Para conhecer o app, <span class="botao">Criar conta grátis (30 dias)</span> abre
+        um escritório novo em teste.</p>
+    </div>
+    <figure>
+      <a href="/ajuda/img/01-login.png"><img src="/ajuda/img/01-login.png" width="1366" height="900" loading="lazy"
+        alt="Tela de entrada do Decidiu com os campos de usuário e senha e o botão Entrar"></a>
+      <figcaption><b>Tela de entrada.</b> Depois de entrar, você vai direto para a linha do tempo do último projeto.</figcaption>
+    </figure>
+    <h3>Trocar de projeto</h3>
+    <ol class="passos">
+      <li>Toque no menu (☰), no canto superior esquerdo.</li>
+      <li>Escolha o projeto na lista <span class="botao">Projeto</span>. Aparecem só os projetos a que você tem acesso.</li>
+    </ol>
+    <figure>
+      <a href="/ajuda/img/03-menu.png"><img src="/ajuda/img/03-menu.png" width="1366" height="900" loading="lazy"
+        alt="Menu lateral aberto com a escolha do projeto e as opções Pendências, Ficha, Cronograma e Relatório PDF"></a>
+      <figcaption><b>Menu lateral.</b> Em cima ficam as telas do projeto; em Gestão do projeto, as opções de quem é responsável.</figcaption>
+    </figure>
+  </section>
+
+  <section class="folha" id="perfis">
+    <p class="numero-folha">Folha 02</p>
+    <h2>Equipe e cliente</h2>
+    <div class="texto">
+      <p>Cada pessoa tem um tipo de acesso em cada projeto. O cliente acompanha tudo, mas não altera nada.</p>
+    </div>
+    <table class="papeis">
+      <thead><tr><th scope="col">Acesso</th><th scope="col">O que pode fazer</th></tr></thead>
+      <tbody>
+        <tr><td>Leitor (cliente)</td><td>Vê decisões, atas fechadas, pendências, ficha, cronograma e documentos; gera o relatório em PDF. Não vê atas em rascunho.</td></tr>
+        <tr><td>Editor</td><td>Tudo do Leitor, mais registrar decisões, escrever e fechar atas, cuidar das pendências, alterar a ficha e revisar o cronograma.</td></tr>
+        <tr><td>Responsável</td><td>Tudo do Editor, mais editar os dados do projeto e dar ou retirar acesso das pessoas.</td></tr>
+        <tr><td>Administrador</td><td>Responsável em todos os projetos do escritório; cadastra os usuários e o logo da empresa.</td></tr>
+      </tbody>
+    </table>
+    <figure>
+      <a href="/ajuda/img/15-cliente-menu.png"><img src="/ajuda/img/15-cliente-menu.png" width="1366" height="900" loading="lazy"
+        alt="Menu lateral visto pelo cliente, sem as opções de gestão do projeto"></a>
+      <figcaption><b>O que o cliente vê.</b> O menu não tem as opções de gestão, e os botões de registrar não aparecem.</figcaption>
+    </figure>
+  </section>
+
+  <section class="folha" id="projetos">
+    <p class="numero-folha">Folha 03</p>
+    <h2>Projetos: criar, editar, arquivar</h2>
+    <div class="texto">
+      <p>As opções de projeto ficam no menu (☰), em <span class="botao">Gestão do projeto</span>. Criar
+        está disponível para a equipe; editar, arquivar e excluir, para o Responsável do projeto e o administrador.</p>
+    </div>
+    <h3>Criar um projeto</h3>
+    <ol class="passos">
+      <li>No menu, toque em <span class="botao">Novo projeto</span>.</li>
+      <li>Informe o nome do projeto, o cliente e, se quiser, uma descrição.</li>
+      <li>Toque em <span class="botao">Criar projeto</span>. Você vira Responsável por ele e o app já abre a linha do tempo nova.</li>
+      <li>Dê acesso à equipe e ao cliente em <span class="botao">Membros e acessos</span> (folha 12) e preencha a <a href="#ficha">ficha do empreendimento</a>.</li>
+    </ol>
+    <figure>
+      <a href="/ajuda/img/17-novo-projeto.png"><img src="/ajuda/img/17-novo-projeto.png" width="1366" height="900" loading="lazy"
+        alt="Janela Criar novo projeto com os campos nome do projeto, cliente e descrição"></a>
+      <figcaption><b>Criar novo projeto.</b> O projeto já nasce com a lista padrão de documentos de referência.</figcaption>
+    </figure>
+    <h3>Editar os dados e o logo do cliente</h3>
+    <div class="texto">
+      <p>Em <span class="botao">Editar projeto</span>, altere nome, cliente e descrição e envie o logo do cliente,
+        que aparece no cabeçalho dos relatórios e das atas em PDF (PNG ou JPG, até 5 MB).</p>
+    </div>
+    <figure>
+      <a href="/ajuda/img/18-editar-projeto.png"><img src="/ajuda/img/18-editar-projeto.png" width="1366" height="900" loading="lazy"
+        alt="Janela Editar projeto com nome, cliente, descrição e o logo do cliente"></a>
+      <figcaption><b>Editar projeto.</b> Toque em <span class="botao">Salvar alterações</span> para gravar.</figcaption>
+    </figure>
+    <h3>Arquivar e reativar</h3>
+    <div class="texto">
+      <p>Arquive o projeto quando ele terminar. Ele sai das listas e da escolha de projetos, mas tudo fica
+        guardado: decisões, atas, ficha, cronograma e documentos. Projeto arquivado não conta no limite de
+        projetos do seu plano.</p>
+    </div>
+    <ol class="passos">
+      <li>Com o projeto aberto, toque em <span class="botao">Arquivar projeto</span> no menu. O app vai para outro projeto.</li>
+      <li>Para ver os arquivados, toque em <span class="botao">Projetos arquivados</span>.</li>
+      <li>Para voltar a trabalhar num deles, toque em <span class="botao">Reativar</span>.</li>
+    </ol>
+    <figure>
+      <a href="/ajuda/img/19-projetos-arquivados.png"><img src="/ajuda/img/19-projetos-arquivados.png" width="1366" height="900" loading="lazy"
+        alt="Janela Projetos arquivados com um projeto e o botão Reativar"></a>
+      <figcaption><b>Projetos arquivados.</b> Reativar pode ser recusado se o plano já estiver no limite de projetos ativos.</figcaption>
+    </figure>
+    <div class="nota"><b>Excluir é definitivo.</b> <span class="botao">Excluir projeto</span> apaga o projeto e
+      tudo o que há nele, sem volta, e pede que você digite o nome do projeto para confirmar. Na dúvida, arquive.</div>
+  </section>
+
+  <section class="folha" id="linha-do-tempo">
+    <p class="numero-folha">Folha 04</p>
+    <h2>Linha do tempo</h2>
+    <div class="texto">
+      <p>A tela principal mostra decisões e atas em ordem de data, das mais recentes para as mais antigas.
+        Cada decisão tem um código (D-001, D-002…), a disciplina em cor, a justificativa e o checklist.</p>
+      <p>Embaixo da decisão aparece o que ela mudou: <em>Ficha · Tipo de laje: Maciça → Nervurada</em> e,
+        se revisou o cronograma, <em>Impacta cronograma · Versão 3</em>.</p>
+    </div>
+    <figure>
+      <a href="/ajuda/img/02-linha-do-tempo.png"><img src="/ajuda/img/02-linha-do-tempo.png" width="1366" height="900" loading="lazy"
+        alt="Linha do tempo com uma ata em rascunho e decisões com disciplina, justificativa e checklist"></a>
+      <figcaption><b>Linha do tempo.</b> Os botões do topo levam a Nova Decisão, Atas de Reunião e Pendências (com o número de pendências em aberto).</figcaption>
+    </figure>
+    <div class="nota"><b>Procurar.</b> A busca encontra palavras no título, na descrição, na disciplina,
+      no autor e no nome dos anexos, com ou sem acento.</div>
+  </section>
+
+  <section class="folha" id="decisoes">
+    <p class="numero-folha">Folha 05</p>
+    <h2>Registrar uma decisão</h2>
+    <ol class="passos">
+      <li>Na linha do tempo, toque em <span class="botao">+ Nova Decisão</span>.</li>
+      <li>Preencha o título, a disciplina, o impacto, o que foi decidido e a justificativa.</li>
+      <li>Se quiser, monte um checklist de aprovações e anexe arquivos.</li>
+      <li>Se a decisão muda um dado do empreendimento, escolha o <span class="botao">Campo da ficha</span> e
+        informe o novo valor. A ficha é atualizada na hora, ligada a esta decisão.</li>
+      <li>Toque em <span class="botao">Salvar</span>. A decisão recebe o próximo código (D-036, por exemplo).</li>
+    </ol>
+    <figure>
+      <a href="/ajuda/img/04-nova-decisao.png"><img src="/ajuda/img/04-nova-decisao.png" width="1366" height="900" loading="lazy"
+        alt="Janela Registrar Decisão com título, categoria, impacto, descrição, justificativa, checklist e alteração da ficha"></a>
+      <figcaption><b>Registrar Decisão.</b> O campo da ficha é opcional; deixe em “não altera a ficha” quando não houver mudança.</figcaption>
+    </figure>
+    <div class="nota"><b>Decisões não são apagadas.</b> Elas são a memória do projeto. Para corrigir ou rever
+      uma decisão, registre outra decisão que a cite (por exemplo, “Lajes nervuradas no lugar das maciças
+      (revisão da D-009)”). O histórico fica completo.</div>
+  </section>
+
+  <section class="folha" id="atas">
+    <p class="numero-folha">Folha 06</p>
+    <h2>Atas de reunião</h2>
+    <div class="texto">
+      <p>A ata é escrita em rascunho, que só a equipe vê. Ao fechá-la, as linhas marcadas viram registros,
+        tudo de uma vez. Depois de fechada, o texto não muda: correções entram como adendo.</p>
+    </div>
+    <h3>Escrever e fechar</h3>
+    <ol class="passos">
+      <li>Abra <span class="botao">Atas de Reunião</span> e toque em <span class="botao">+ Nova Ata</span>.</li>
+      <li>Informe o título, a data, os participantes e o texto. Use <span class="botao">Salvar rascunho</span> quantas vezes precisar.</li>
+      <li>Marque as linhas que devem virar registro (veja abaixo). <span class="botao">Inserir linha [D]</span> ajuda a montar a linha de decisão.</li>
+      <li>Toque em <span class="botao">Fechar ata</span>. O app avisa se alguma linha estiver fora do formato e não grava nada até você corrigir.</li>
+    </ol>
+    <h3>As três marcações</h3>
+    <ul class="exemplo-ata">
+      <li class="d"><span class="marcacao">[D] (Estrutura) (Alto) Lajes nervuradas no lugar das maciças: cubetas plásticas, h = 30 cm</span>
+        <small>Vira uma decisão. Entre parênteses, a disciplina e o impacto (Alto, Médio ou Baixo); antes dos dois-pontos, o título.</small></li>
+      <li class="f"><span class="marcacao">[F] Tipo de laje = Nervurada</span>
+        <small>Altera a ficha. Fica ligada à última linha [D] acima dela.</small></li>
+      <li class="p"><span class="marcacao">[P] Laudo cautelar de vizinhança antes das fundações</span>
+        <small>Vira uma pendência, para decidir depois.</small></li>
+    </ul>
+    <figure>
+      <a href="/ajuda/img/06-ata-aberta.png"><img src="/ajuda/img/06-ata-aberta.png" width="1366" height="900" loading="lazy"
+        alt="Ata 06 fechada com linhas de decisão em azul e linhas de alteração da ficha em verde"></a>
+      <figcaption><b>Ata fechada.</b> As linhas [D] (azul) viraram as decisões D-026 a D-029; as linhas [F] (verde) mudaram o orçamento, o aquecimento e a fachada na ficha.</figcaption>
+    </figure>
+    <figure>
+      <a href="/ajuda/img/05-atas.png"><img src="/ajuda/img/05-atas.png" width="1366" height="900" loading="lazy"
+        alt="Lista de atas com uma em rascunho e outras fechadas"></a>
+      <figcaption><b>Lista de atas.</b> Rascunhos mostram <span class="botao">Continuar editando</span>; atas fechadas, <span class="botao">Abrir ata</span>.</figcaption>
+    </figure>
+    <h3>Rascunho a partir da transcrição</h3>
+    <div class="texto">
+      <p>Se a reunião foi gravada, use <span class="botao">Importar transcrição</span> e depois
+        <span class="botao">Gerar rascunho</span>. A inteligência artificial sugere o texto e as linhas [D], [F] e [P].
+        Nada é registrado até você revisar e fechar a ata.</p>
+      <p>Para corrigir uma ata fechada, abra-a e use <span class="botao">Registrar adendo</span>. O PDF da ata sai em <span class="botao">Gerar PDF</span>.</p>
+    </div>
+  </section>
+
+  <section class="folha" id="pendencias">
+    <p class="numero-folha">Folha 07</p>
+    <h2>Pendências</h2>
+    <div class="texto">
+      <p>Pendência é um assunto que ainda espera decisão, com responsável e prazo. Ela nasce na tela de
+        pendências ou numa linha [P] de ata. As abertas aparecem primeiro, com o prazo mais próximo no topo.</p>
+    </div>
+    <ul class="lista">
+      <li><span class="botao">Resolver</span>: liga a pendência à decisão que a resolveu, já registrada ou criada na hora.</li>
+      <li><span class="botao">Cancelar pendência</span>: quando o assunto deixou de existir. O motivo fica registrado.</li>
+      <li><span class="botao">Reabrir</span>: devolve uma pendência resolvida ou cancelada para a lista de abertas.</li>
+    </ul>
+    <figure>
+      <a href="/ajuda/img/07-pendencias.png"><img src="/ajuda/img/07-pendencias.png" width="1366" height="900" loading="lazy"
+        alt="Lista de pendências em aberto com responsável, prazo e botões Editar, Cancelar e Resolver"></a>
+      <figcaption><b>Pendências de decisão.</b> Use o filtro Situação para ver as resolvidas e as canceladas.</figcaption>
+    </figure>
+  </section>
+
+  <section class="folha" id="ficha">
+    <p class="numero-folha">Folha 08</p>
+    <h2>Ficha do empreendimento</h2>
+    <div class="texto">
+      <p>A ficha reúne os dados de partida do projeto: terreno, parâmetros urbanísticos, programa, padrão,
+        prazo e custo. Os indicadores (projeção máxima, potencial construtivo, área permeável) são calculados
+        sozinhos, com um alerta se a área prevista passar do potencial.</p>
+    </div>
+    <h3>Tipologia e sistemas construtivos</h3>
+    <ol class="passos">
+      <li>No card <span class="botao">Programa</span>, escolha o <span class="botao">Uso / tipologia</span>: Residencial,
+        Comercial, Industrial, Condomínio de lotes, Corporativo, Shopping Center ou Data Center.</li>
+      <li>O card <span class="botao">Sistemas construtivos</span> mostra os campos daquela tipologia. Algumas escolhas
+        abrem outras: com estrutura de concreto armado convencional aparece o <em>Tipo de laje</em>.</li>
+      <li>Em <span class="botao">Alturas e dimensões</span>, informe piso a piso, pés-direitos e espessura do contrapiso.</li>
+      <li>Se nenhuma opção servir, escolha <span class="botao">Outro</span> e escreva o valor.</li>
+      <li>Toque em <span class="botao">Salvar ficha</span>.</li>
+    </ol>
+    <figure>
+      <a href="/ajuda/img/08-ficha.png"><img src="/ajuda/img/08-ficha.png" width="1366" height="900" loading="lazy"
+        alt="Ficha com o card Programa e o card Sistemas construtivos de um edifício residencial"></a>
+      <figcaption><b>Programa e sistemas construtivos.</b> Tipologia Residencial: estrutura, laje, fundações, vedações, fachada, esquadrias e aquecimento.</figcaption>
+    </figure>
+    <figure>
+      <a href="/ajuda/img/09-ficha-alturas.png"><img src="/ajuda/img/09-ficha-alturas.png" width="1366" height="900" loading="lazy"
+        alt="Card Alturas e dimensões com piso a piso, pés-direitos e espessura do contrapiso"></a>
+      <figcaption><b>Alturas e dimensões.</b> Os campos mudam com a tipologia: Industrial pede altura de portões e doca; Shopping, ABL e número de lojas.</figcaption>
+    </figure>
+    <div class="nota"><b>Trocar a tipologia.</b> Os campos que não valem mais para a nova tipologia são limpos
+      ao salvar. Nada se perde: <span class="botao">Histórico</span> mostra cada mudança da ficha, quem fez e a
+      decisão ou ata de origem.</div>
+  </section>
+
+  <section class="folha" id="cronograma">
+    <p class="numero-folha">Folha 09</p>
+    <h2>Cronograma</h2>
+    <div class="texto">
+      <p>O cronograma macro mostra as etapas (barras) e os marcos (losangos) do projeto. A primeira versão é a
+        linha de base. Cada revisão cria uma versão nova, ligada à decisão que a motivou, e as anteriores
+        ficam guardadas para comparar.</p>
+    </div>
+    <h3>Criar</h3>
+    <ol class="passos">
+      <li>No menu, abra <span class="botao">Cronograma</span> e toque em <span class="botao">Criar cronograma</span>.</li>
+      <li>Informe a data do Kick-off, marque as etapas do projeto com início e entrega e a data de Liberado para obra.</li>
+      <li>Inclua etapas ou marcos próprios em <span class="botao">+ Adicionar etapa</span> e <span class="botao">+ Adicionar marco</span>.</li>
+      <li>Toque em <span class="botao">Salvar cronograma</span>.</li>
+    </ol>
+    <figure>
+      <a href="/ajuda/img/10-cronograma.png"><img src="/ajuda/img/10-cronograma.png" width="1366" height="900" loading="lazy"
+        alt="Gráfico de Gantt com as etapas do projeto, barras laranja nas entregas atrasadas e barras cinza da linha de base"></a>
+      <figcaption><b>Gantt.</b> Em cinza, a versão de referência; em laranja, as etapas com entrega depois da referência, com o desvio ao lado do nome. A linha vermelha marca hoje.</figcaption>
+    </figure>
+    <h3>Revisar</h3>
+    <ol class="passos">
+      <li>Toque em <span class="botao">Revisar cronograma</span>.</li>
+      <li>Mude a data de entrega da etapa atrasada. As etapas seguintes se recalculam na hora e aparecem como
+        <em>recalculada</em>. Ajuste qualquer data à mão, se precisar.</li>
+      <li>Em <span class="botao">Decisão que motivou</span>, escolha uma decisão já registrada ou <em>Nova decisão…</em>.</li>
+      <li>Toque em <span class="botao">Salvar revisão</span>.</li>
+    </ol>
+    <figure>
+      <a href="/ajuda/img/11-cronograma-revisar.png"><img src="/ajuda/img/11-cronograma-revisar.png" width="1366" height="900" loading="lazy"
+        alt="Formulário de revisão do cronograma com as datas de início e entrega de cada etapa"></a>
+      <figcaption><b>Revisar cronograma.</b> Desmarque <em>Depende da anterior</em> nas etapas que correm em paralelo, como a aprovação na prefeitura: elas não andam com as outras.</figcaption>
+    </figure>
+    <div class="nota"><b>Comparar versões.</b> Em <span class="botao">Comparar com</span>, escolha a versão 1, a
+      versão anterior ou nenhuma. <span class="botao">Versões</span> lista todas, com a decisão de cada uma.</div>
+  </section>
+
+  <section class="folha" id="documentos">
+    <p class="numero-folha">Folha 10</p>
+    <h2>Documentos de referência</h2>
+    <div class="texto">
+      <p>É o checklist do que o cliente precisa entregar: levantamento topográfico, sondagens, layout, BEP e o
+        que mais o projeto pedir. Abra pela ficha, em <span class="botao">Documentos de referência</span>.</p>
+    </div>
+    <ol class="passos">
+      <li>Marque cada item como Recebido, Pendente ou N/A (não se aplica).</li>
+      <li>Em <span class="botao">Anexar arquivo</span>, envie o arquivo com a data em que ele chegou, que pode ser anterior ao envio.</li>
+      <li>Inclua itens próprios em <span class="botao">+ Novo Item</span>. O botão <span class="botao">PDF</span> gera a lista para enviar ao cliente.</li>
+    </ol>
+    <figure>
+      <a href="/ajuda/img/12-documentos.png"><img src="/ajuda/img/12-documentos.png" width="1366" height="900" loading="lazy"
+        alt="Lista de documentos de referência com situação Recebido, Pendente ou N/A e datas de recebimento"></a>
+      <figcaption><b>Documentos de referência.</b> A barra no topo mostra quantos itens aplicáveis já chegaram.</figcaption>
+    </figure>
+  </section>
+
+  <section class="folha" id="relatorio">
+    <p class="numero-folha">Folha 11</p>
+    <h2>Relatório em PDF</h2>
+    <ol class="passos">
+      <li>No menu, toque em <span class="botao">Relatório PDF</span>.</li>
+      <li>Se quiser, limite por período ou por disciplina.</li>
+      <li>Escolha o que entra: ficha do empreendimento, documentos de referência, cronograma (gráfico de Gantt
+        e tabela de desvios) e os detalhes das decisões.</li>
+      <li>Toque em <span class="botao">Gerar PDF</span> e abra o link.</li>
+    </ol>
+    <figure>
+      <a href="/ajuda/img/13-relatorio.png"><img src="/ajuda/img/13-relatorio.png" width="1366" height="900" loading="lazy"
+        alt="Janela Relatório de decisões com filtros de data e categoria e as opções do que incluir"></a>
+      <figcaption><b>Relatório de decisões.</b> O PDF sai com o logo do escritório e o do cliente no cabeçalho.</figcaption>
+    </figure>
+    <div class="nota"><b>Logos.</b> O administrador envia o logo do escritório em <span class="botao">Logo da empresa (PDFs)</span>;
+      o responsável pelo projeto envia o do cliente em <span class="botao">Editar projeto</span>.</div>
+  </section>
+
+  <section class="folha" id="membros">
+    <p class="numero-folha">Folha 12</p>
+    <h2>Membros e acessos</h2>
+    <ol class="passos">
+      <li>No menu, toque em <span class="botao">Membros e acessos</span>.</li>
+      <li>Digite o usuário (login) da pessoa e escolha o acesso: Responsável, Editor ou Leitor.</li>
+      <li>Toque em <span class="botao">Dar acesso</span>. Para tirar o acesso, use o ícone de lixeira ao lado do nome.</li>
+    </ol>
+    <figure>
+      <a href="/ajuda/img/14-membros.png"><img src="/ajuda/img/14-membros.png" width="1366" height="900" loading="lazy"
+        alt="Janela Membros do projeto com a lista de pessoas e o tipo de acesso de cada uma"></a>
+      <figcaption><b>Membros do projeto.</b> A pessoa precisa ter um usuário no escritório; quem cadastra é o administrador, em <span class="botao">Usuários da organização</span>.</figcaption>
+    </figure>
+    <div class="nota"><b>Clientes não contam no plano.</b> Usuários que só acompanham (Leitor sem permissão de criar
+      projetos) não ocupam vaga de integrante da equipe.</div>
+  </section>
+
+  <section class="folha" id="celular">
+    <p class="numero-folha">Folha 13</p>
+    <h2>No celular</h2>
+    <div class="texto">
+      <p>O Decidiu funciona no navegador do celular, sem instalar nada. Os botões ficam com nomes curtos
+        e as telas se ajustam à largura. Para abrir como um app, use “Adicionar à tela de início” no menu do navegador.</p>
+    </div>
+    <figure class="estreita">
+      <a href="/ajuda/img/16-celular.png"><img src="/ajuda/img/16-celular.png" width="390" height="844" loading="lazy"
+        alt="Linha do tempo no celular com os botões Decisão, Atas e Pendências"></a>
+      <figcaption><b>Linha do tempo no celular.</b></figcaption>
+    </figure>
+  </section>
+
+  <section class="folha" id="perguntas">
+    <p class="numero-folha">Folha 14</p>
+    <h2>Perguntas frequentes</h2>
+    <details class="pergunta"><summary>Posso editar ou apagar uma decisão?</summary>
+      <p>Não. A decisão registrada é a memória do projeto. Registre uma nova decisão que corrija ou reveja a
+        anterior e cite o código dela no título. Na ata fechada, use o adendo.</p></details>
+    <details class="pergunta"><summary>A ficha mudou e não fui eu. Como saber o motivo?</summary>
+      <p>Abra <span class="botao">Histórico</span> na ficha. Cada mudança mostra quem fez, quando e a origem
+        (por exemplo, <em>Decisão D-010 · Ata 03</em>).</p></details>
+    <details class="pergunta"><summary>Por que o cliente não vê a ata que escrevi?</summary>
+      <p>Atas em rascunho são só da equipe. O cliente passa a ver quando a ata é fechada.</p></details>
+    <details class="pergunta"><summary>A ata não fecha. O que fazer?</summary>
+      <p>O app mostra qual linha está fora do formato. Confira se cada [D] tem disciplina e impacto entre
+        parênteses e se cada [F] tem o sinal de igual, como em <code>[F] Vagas de garagem = 70</code>. O campo
+        da linha [F] precisa existir na ficha e valer para a tipologia do projeto.</p></details>
+    <details class="pergunta"><summary>Preciso de uma decisão para revisar o cronograma?</summary>
+      <p>Sim. Toda versão nova fica ligada à decisão que a motivou. Se ainda não há decisão, escolha
+        <em>Nova decisão…</em> na revisão e ela é criada junto.</p></details>
+    <details class="pergunta"><summary>Arquivar ou excluir um projeto?</summary>
+      <p>Arquive. O projeto arquivado sai das listas e não conta no plano, mas guarda toda a memória e pode
+        ser reativado. Excluir apaga tudo sem volta.</p></details>
+    <details class="pergunta"><summary>Esqueci a senha.</summary>
+      <p>Na tela de entrada, use <span class="botao">Esqueci minha senha</span>. Se o e-mail não estiver
+        cadastrado, peça ao administrador do seu escritório para redefinir.</p></details>
+  </section>
+</main>
+
+<script>
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('#indice a'));
+    var secoes = links.map(function (a) { return document.getElementById(a.getAttribute('href').slice(1)); });
+
+    // folha atual no índice
+    if ('IntersectionObserver' in window) {
+      var obs = new IntersectionObserver(function (entradas) {
+        entradas.forEach(function (e) {
+          if (!e.isIntersecting) return;
+          links.forEach(function (a) {
+            a.setAttribute('aria-current', a.getAttribute('href') === '#' + e.target.id ? 'true' : 'false');
+          });
+        });
+      }, { rootMargin: '-20% 0px -70% 0px' });
+      secoes.forEach(function (s) { obs.observe(s); });
+    }
+
+    // busca: esconde as folhas e os itens do índice que não têm a palavra (sem acentos)
+    function normal(t) { return t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+    var textos = secoes.map(function (s) { return normal(s.textContent); });
+    var campo = document.getElementById('campo-busca');
+    var vazio = document.getElementById('sem-resultado');
+    campo.addEventListener('input', function () {
+      var termo = normal(campo.value.trim());
+      var achou = 0;
+      secoes.forEach(function (s, i) {
+        var ok = !termo || textos[i].indexOf(termo) !== -1;
+        s.classList.toggle('oculta', !ok);
+        links[i].parentNode.classList.toggle('oculto', !ok);
+        if (ok) achou++;
+      });
+      vazio.style.display = achou ? 'none' : 'block';
+    });
+
+    // índice recolhível no celular
+    var lateral = document.getElementById('lateral');
+    var botao = document.getElementById('abrir-indice');
+    botao.addEventListener('click', function () {
+      var aberto = lateral.classList.toggle('aberta');
+      botao.setAttribute('aria-expanded', aberto ? 'true' : 'false');
+    });
+    links.forEach(function (a) {
+      a.addEventListener('click', function () {
+        lateral.classList.remove('aberta');
+        botao.setAttribute('aria-expanded', 'false');
+      });
+    });
+  })();
+</script>
+</body>
+</html>

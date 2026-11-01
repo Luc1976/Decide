@@ -1,0 +1,12 @@
+{
+  "name": "decidiu-capturas-ajuda",
+  "private": true,
+  "description": "Gera as capturas de tela da página de ajuda (ajuda/img) a partir do projeto de demonstração.",
+  "scripts": { "capturar": "node capturar.js" },
+  "dependencies": {
+    "playwright": "1.48.2",
+    "@fontsource/roboto": "5.1.0",
+    "@fontsource/noto-sans-symbols": "5.1.0",
+    "@fontsource/noto-sans-symbols-2": "5.1.0"
+  }
+}
